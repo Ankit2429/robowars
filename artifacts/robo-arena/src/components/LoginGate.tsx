@@ -1,0 +1,162 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Sword, Zap, AlertTriangle } from "lucide-react";
+import { useSession } from "@/context/SessionContext";
+import { STARTING_POINTS } from "@/lib/session";
+
+export function LoginGate({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, isEliminated, login, logout, session } = useSession();
+  const [username, setUsername] = useState("");
+  const [error, setError]       = useState("");
+  const [shake, setShake]       = useState(false);
+
+  if (isLoggedIn && isEliminated) {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black">
+        <div className="scanlines opacity-30" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative text-center space-y-6 p-10 max-w-lg"
+        >
+          <motion.div
+            animate={{ opacity: [1, 0.2, 1] }}
+            transition={{ repeat: Infinity, duration: 1.4 }}
+            className="text-[#ff2222] text-9xl select-none"
+          >
+            ☠
+          </motion.div>
+          <h1 className="font-display text-4xl font-black text-white uppercase tracking-widest">
+            ACCESS <span className="text-[#ff2222]">DENIED</span>
+          </h1>
+          <p className="font-mono text-muted-foreground text-sm uppercase tracking-widest">
+            PILOT {session?.username} — UNIT PERMANENTLY DESTROYED
+          </p>
+          <p className="font-mono text-[#ff5555] text-xs border border-[#ff2222]/30 p-3 bg-[#ff2222]/5">
+            Your combat record shows a catastrophic defeat. This account has been decommissioned.
+            No recovery. No rematch. The arena remembers.
+          </p>
+          <button
+            onClick={logout}
+            className="w-full py-4 font-display font-bold text-lg uppercase tracking-widest border-2 border-[#ff2222] text-[#ff2222] hover:bg-[#ff2222] hover:text-black transition-all duration-200"
+          >
+            EJECT &amp; START OVER
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (isLoggedIn) return <>{children}</>;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = username.trim();
+    if (trimmed.length < 2) {
+      setError("PILOT ID must be at least 2 characters");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    if (trimmed.length > 16) {
+      setError("PILOT ID must be 16 characters or less");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    setError("");
+    login(trimmed);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden">
+      <div className="scanlines opacity-40" />
+      <div className="crt-flicker" />
+
+      {/* Background glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[700px] h-[700px] rounded-full bg-primary/15 blur-[140px]" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-md px-6"
+      >
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Sword className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="font-display text-6xl font-black tracking-tighter text-white drop-shadow-[0_0_20px_rgba(255,69,0,0.5)]">
+            ROBO<span className="text-primary">ARENA</span>
+          </h1>
+          <p className="font-mono text-muted-foreground tracking-widest text-xs mt-2 uppercase">
+            Combat Registration System
+          </p>
+        </div>
+
+        {/* Starting budget info */}
+        <div className="brutal-border bg-primary/5 border-primary/40 p-4 mb-6 flex items-center gap-3">
+          <Zap className="h-5 w-5 text-primary shrink-0" />
+          <div>
+            <p className="font-display text-primary font-bold text-sm uppercase tracking-widest">
+              Starting Budget: {STARTING_POINTS.toLocaleString()} pts
+            </p>
+            <p className="font-mono text-xs text-muted-foreground mt-0.5">
+              Spend points to build your robot. Win battles to earn more.
+            </p>
+          </div>
+        </div>
+
+        {/* Login form */}
+        <motion.form
+          onSubmit={handleSubmit}
+          animate={shake ? { x: [-8, 8, -6, 6, -4, 4, 0] } : {}}
+          transition={{ duration: 0.4 }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
+              Pilot ID
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="ENTER CALLSIGN..."
+              maxLength={16}
+              autoFocus
+              className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
+            />
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="font-mono text-xs text-[#ff4444] mt-2 flex items-center gap-1"
+              >
+                <AlertTriangle className="h-3 w-3" /> {error}
+              </motion.p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-4 font-display font-black text-xl uppercase tracking-widest border-2 border-primary text-primary bg-primary/10 hover:bg-primary hover:text-black transition-all duration-200 shadow-[0_0_24px_rgba(255,69,0,0.3)] hover:shadow-[0_0_40px_rgba(255,69,0,0.6)]"
+          >
+            INITIALIZE PILOT
+          </button>
+        </motion.form>
+
+        {/* Warning */}
+        <div className="mt-6 border border-[#ff8800]/30 bg-[#ff8800]/5 p-3">
+          <p className="font-mono text-[10px] text-[#ff8800]/70 text-center uppercase tracking-widest leading-relaxed">
+            ⚠ WARNING: One defeat and your unit is permanently decommissioned.
+            Choose your battles wisely.
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

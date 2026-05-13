@@ -1,0 +1,188 @@
+this are the upadtes for the game to make the match intense and engoyable to play
+
+The arena must already contain:
+
+* floor
+* walls
+* lighting
+* atmosphere
+* props
+* effects
+* environment details
+
+The arena must feel like:
+
+* underground mechanical death arena
+* cyberpunk robot combat stadium
+* industrial horror battle zone
+
+STYLE:
+
+* dark metallic
+* brutal industrial
+* black and red theme
+* realistic metal textures
+* cinematic lighting
+* smoky atmosphere
+* aggressive visuals
+
+---
+
+# ARENA STRUCTURE
+
+Create:
+
+* giant circular battle arena
+* metal floor panels
+* scratched steel textures
+* glowing red neon strips
+* industrial side walls
+* giant mechanical gates
+* audience screens
+* warning lights
+* overhead metal structures
+
+Arena should NOT feel empty.
+
+Add:
+
+* pipes
+* cables
+* chains
+* smoke vents
+* sparks
+* industrial machinery
+* broken debris
+* hanging lights
+
+---
+
+# FLOOR DESIGN
+
+The floor must contain:
+
+* metal panels
+* battle scratches
+* burn marks
+* glowing cracks
+* hazard zones
+* moving mechanical plates
+
+Center arena:
+
+* giant BLOODX logo
+* illuminated red glow
+
+Add reflections on metal floor.
+
+---
+
+# LIGHTING
+
+Use cinematic lighting.
+
+Add:
+
+* red neon lights
+* industrial spotlights
+* flickering warning lights
+* volumetric fog
+* smoke particles
+* sparks particles
+
+Lighting should make robots clearly visible.
+
+DO NOT make the arena pitch black.
+
+---
+
+# ATMOSPHERE
+
+Add:
+
+* smoke effects
+* steam vents
+* floating dust particles
+* sparks
+* animated fog
+* glowing red ambience
+
+The arena must feel alive.
+
+---
+
+# ARENA HAZARDS
+
+Place visible hazards:
+
+* spinning saw traps
+* fire vents
+* electric walls
+* crushers
+* spike traps
+
+Hazards must animate.
+
+---
+
+# CAMERA
+
+Create cinematic camera:
+
+* slightly tilted angle
+* dynamic zoom
+* smooth movement
+* dramatic close combat camera
+* camera shake during impacts
+
+---
+
+# ROBOTS
+
+Place 2 sample robots in arena.
+
+Robots should:
+
+* cast shadows
+* reflect lighting
+* move properly
+* feel grounded on floor
+
+---
+
+# MATERIALS
+
+Use realistic PBR materials:
+
+* metal
+* rust
+* scratches
+* emissive neon
+* rough industrial surfaces
+
+---
+
+# PERFORMANCE
+
+Optimize scene for:
+
+* browser gameplay
+* smooth FPS
+* multiplayer support
+
+---
+
+# FINAL GOAL
+
+The arena must feel:
+
+* brutal
+* cinematic
+* mechanical
+* futuristic
+* alive
+* detailed
+* immersive
+
+DO NOT generate an empty black scene.
+Generate a complete detailed battle arena environment with lighting, atmosphere, hazards, and industrial props.

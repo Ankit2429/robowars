@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start API Server",
+      "type": "shell",
+      "command": "pnpm --filter @workspace/api-server run dev",
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "label": "API Server"
+      }
+    },
+    {
+      "label": "Start Frontend",
+      "type": "shell",
+      "command": "pnpm --filter @workspace/robo-arena run dev",
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "label": "Frontend"
+      }
+    },
+    {
+      "label": "Start All (API + Frontend)",
+      "dependsOn": ["Start API Server", "Start Frontend"],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Push DB Schema",
+      "type": "shell",
+      "command": "pnpm --filter @workspace/db run push",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "pnpm install",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

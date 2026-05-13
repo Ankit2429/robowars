@@ -1,0 +1,224 @@
+Update the BLOODX robot battle game to make matches more intense, chaotic, addictive, and visually destructive.
+
+Focus ONLY on improving gameplay intensity and battle excitement.
+
+---
+
+# ADD ARENA HAZARDS
+
+The arena must feel dangerous and unpredictable.
+
+Add hazards such as:
+
+* fire floors
+* electric walls
+* giant spinning saws
+* crushing walls
+* spike traps
+* lava pits
+* rotating floor sections
+* EMP zones
+
+Arena hazards should activate randomly during matches.
+
+The hazards must:
+
+* damage robots
+* change player strategy
+* force movement
+* create chaos
+
+---
+
+# IMPROVE DAMAGE SYSTEM
+
+Robot damage must look brutal and realistic.
+
+Add:
+
+* broken armor pieces
+* detached wheels
+* sparks
+* smoke
+* oil leaks
+* overheating effects
+* weapon malfunction
+* destroyed parts flying away
+* burning metal effects
+
+Heavy impacts should:
+
+* shake the camera
+* create debris
+* produce loud metal sounds
+
+When weapons break:
+
+* visually detach from robot
+* stop functioning
+
+---
+
+# ADD LAST STAND MODE
+
+When robot HP becomes critically low:
+
+* screen flashes red
+* warning alarms activate
+* robot enters “Last Stand Mode”
+
+Effects:
+
+* temporary speed increase
+* temporary attack increase
+* more aggressive movement
+
+Display warning:
+“CRITICAL DAMAGE”
+
+This creates comeback moments and tension.
+
+---
+
+# MAKE EVERY WEAPON FEEL UNIQUE
+
+Each weapon must completely change gameplay style.
+
+HAMMER:
+
+* slow but devastating
+* huge knockback
+* heavy impact effects
+
+SPINNER:
+
+* fast continuous damage
+* sparks everywhere
+* unstable movement
+
+DRILL:
+
+* armor piercing
+* focused damage
+
+FLIPPER:
+
+* launches enemy robots
+* crowd-control style
+
+CHAINSAW:
+
+* constant pressure damage
+* metal grinding effects
+
+Each weapon must have:
+
+* unique animations
+* unique sounds
+* unique movement effects
+* unique attack style
+
+---
+
+# ADD ACTIVE SKILLS
+
+Add skill-based gameplay.
+
+Examples:
+
+Blood Rage:
+
+* temporary attack boost
+
+EMP Blast:
+
+* disables enemy systems
+
+Overdrive:
+
+* huge speed boost
+
+Shockwave:
+
+* area knockback attack
+
+Repair Drone:
+
+* temporary healing
+
+These skills should create clutch moments during battles.
+
+---
+
+# ADD FINISHER SYSTEM
+
+When enemy HP becomes very low:
+trigger cinematic finishing attacks.
+
+Examples:
+
+* hammer smash finisher
+* robot explosion
+* slow-motion destruction
+* robot ripped apart
+* sparks and debris explosion
+
+Add dramatic camera effects during finishers.
+
+---
+
+# ADD RANDOM MATCH EVENTS
+
+During battles random events may activate.
+
+Examples:
+
+* blackout mode
+* temporary double damage
+* gravity malfunction
+* arena shrink
+* fire storm
+* sudden EMP pulse
+
+Random events must force players to adapt quickly.
+
+---
+
+# MAKE MATCHES FAST AND AGGRESSIVE
+
+Matches should:
+
+* last around 1–3 minutes
+* contain constant action
+* have minimal downtime
+* feel chaotic and intense
+
+The gameplay should reward:
+
+* aggressive strategies
+* skill timing
+* smart robot builds
+* quick reactions
+
+---
+
+# FINAL GOAL
+
+The battles must feel:
+
+* brutal
+* destructive
+* cinematic
+* unpredictable
+* chaotic
+* aggressive
+* highly replayable
+
+Every match should feel different because of:
+
+* hazards
+* destruction
+* active skills
+* random events
+* weapon builds
+* damage physics

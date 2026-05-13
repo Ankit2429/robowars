@@ -1,0 +1,350 @@
+CATEGORY 1 - CHASSIS (12 components):
+═══════════════════════════════════════════════════════════
+
+1. TITAN
+Description: "A massive armored chassis built for endurance. Slow but nearly indestructible."
+3D Visual: Huge rectangular steel block, thick bolt plates on all corners, deep scratches and battle damage, gunmetal grey with rust patches, exposed steel rivet heads along edges, dented surfaces
+ARMOR: 90 | POWER: 60 | SPEED: 30 | ENERGY: 70
+Tradeoffs: +ARMOR penalizes -SPEED -ENERGY
+Icon: Shield with cracks
+
+2. WASP
+Description: "An agile lightweight frame engineered for speed and evasion."
+3D Visual: Slim low-profile wedge shape, smooth carbon fiber panels in dark grey with yellow racing stripe, aerodynamic curved front, tiny and fast-looking, minimal exposed parts
+ARMOR: 30 | POWER: 50 | SPEED: 95 | ENERGY: 80
+Tradeoffs: +SPEED penalizes -ARMOR -POWER
+Icon: Lightning bolt
+
+3. GOLIATH
+Description: "Balanced war machine. Heavy power in a durable industrial frame."
+3D Visual: Wide rectangular body with reinforced corner guards, industrial orange warning stripe along middle, chunky build with visible hydraulic tubes on sides, battle-worn steel finish
+ARMOR: 75 | POWER: 80 | SPEED: 40 | ENERGY: 60
+Tradeoffs: +POWER penalizes -SPEED -ENERGY
+Icon: Fist
+
+4. PHANTOM
+Description: "Ghost-class stealth chassis. Built for unpredictable movement and ambush."
+3D Visual: Matte black angular body with sharp geometric edges, asymmetric design, faint blue glow lines running along seams, nearly invisible in shadows, angular like a stealth aircraft
+ARMOR: 45 | POWER: 70 | SPEED: 75 | ENERGY: 65
+Tradeoffs: Balanced — no single weakness
+Icon: Ghost silhouette
+
+5. FORTRESS
+Description: "Maximum protection shell. Built like a bunker — moves like one too."
+3D Visual: Perfect cube-shaped armored box, overlapping layered steel plates like tank armor, massive bolt heads everywhere, red warning stripes on sides, looks literally immovable
+ARMOR: 100 | POWER: 40 | SPEED: 20 | ENERGY: 50
+Tradeoffs: +ARMOR heavily penalizes -SPEED -POWER -ENERGY
+Icon: Castle tower
+
+6. VIPER
+Description: "Strike fast, strike first. Precision attack frame for hit-and-run tactics."
+3D Visual: Long narrow elongated body, snake-scale texture pattern on panels, neon green accent glow lines, pointed front end, aggressive predatory look, scales etched into surface
+ARMOR: 40 | POWER: 65 | SPEED: 90 | ENERGY: 70
+Tradeoffs: +SPEED penalizes -ARMOR
+Icon: Snake
+
+7. COLOSSUS
+Description: "Oversized combat frame. Dominates by pure mass and raw force."
+3D Visual: Extra-wide massive boxy frame far wider than tall, exposed hydraulic cylinder arms on sides, dull iron surface with deep tool marks, intimidating sheer size
+ARMOR: 85 | POWER: 75 | SPEED: 25 | ENERGY: 55
+Tradeoffs: +ARMOR +POWER penalizes -SPEED -ENERGY
+Icon: Mountains
+
+8. WRAITH
+Description: "High-speed attack ghost. Trades armor for terrifying offensive potential."
+3D Visual: Skeletal minimal frame with exposed internal mechanics visible through gaps, electric blue glowing internal components visible, bone-like structural struts, looks fragile but deadly
+ARMOR: 35 | POWER: 80 | SPEED: 85 | ENERGY: 60
+Tradeoffs: +POWER +SPEED penalizes -ARMOR -ENERGY
+Icon: Skull
+
+9. BULWARK
+Description: "Defensive fortress chassis. Designed to absorb punishment indefinitely."
+3D Visual: Rounded front shield-shaped curved body, layered titanium plating like fish scales, red and black warning stripes, almost semicircular front face, built purely to block
+ARMOR: 95 | POWER: 45 | SPEED: 15 | ENERGY: 45
+Tradeoffs: +ARMOR heavily penalizes all other stats
+Icon: Shield wall
+
+10. LYNX
+Description: "Agile mid-weight predator. Balances speed with enough bite to finish fights."
+3D Visual: Sleek curved organic-looking body, spotted leopard-pattern titanium panels, retractable side guards that fold out, athletic crouched stance, predator cat silhouette
+ARMOR: 50 | POWER: 55 | SPEED: 88 | ENERGY: 75
+Tradeoffs: +SPEED penalizes -ARMOR -POWER
+Icon: Paw print
+
+11. RHINO
+Description: "Charging brute force chassis. Built to ram and destroy on impact."
+3D Visual: Front-heavy design with massive reinforced nose cone like a battering ram, thick armored side walls, battle-scarred gray metal, charging horn protrusion on front, stocky and powerful
+ARMOR: 80 | POWER: 85 | SPEED: 35 | ENERGY: 50
+Tradeoffs: +ARMOR +POWER penalizes -SPEED -ENERGY
+Icon: Rhino horn
+
+12. SHADOW
+Description: "Ultra-light stealth sprinter. Fastest chassis — almost zero protection."
+3D Visual: Paper-thin carbon shell almost invisible, near-invisible matte black all over, single glowing red sensor eye, ghost-like translucent edges, barely there physically
+ARMOR: 25 | POWER: 60 | SPEED: 100 | ENERGY: 90
+Tradeoffs: +SPEED +ENERGY heavily penalizes -ARMOR
+Icon: Eye glow
+
+═══════════════════════════════════════════════════════════
+CATEGORY 2 - WEAPON PRIMARY (12 components):
+═══════════════════════════════════════════════════════════
+
+1. TITAN DISC
+Description: "Full-body spinning steel disc. Shreds anything it contacts on all sides."
+3D Visual: Large horizontal flywheel disc with 8 jagged tungsten teeth around rim, chrome spinning hub center, teeth show impact damage and metal shavings, blur effect when spinning, mounted low on chassis
+POWER: 95 | SPEED PENALTY: -25 | ENERGY DRAIN: -20 | ARMOR PENALTY: -10
+Tradeoff: Maximum damage but drains energy fast and slows bot significantly
+Icon: Spinning circle
+
+2. HAMMERHEAD
+Description: "Hydraulic overhead hammer. Single devastating downward strike."
+3D Visual: Tall vertical pneumatic arm extending above chassis, rectangular hardened steel hammerhead at top, two visible silver hydraulic piston cylinders, grease stains on pistons, battle-scarred head
+POWER: 85 | SPEED PENALTY: -15 | ENERGY DRAIN: -12 | ARMOR PENALTY: 0
+Tradeoff: High burst damage, slow attack rate
+Icon: Hammer
+
+3. VERTICAL SPINNER
+Description: "Vertical blade disc that launches opponents airborne on contact."
+3D Visual: Upright circular blade disc facing forward, exposed flywheel motor housing, thick blade with sharpened outer edge, sparks trail off spinning edge, mounted on front frame
+POWER: 90 | SPEED PENALTY: -20 | ENERGY DRAIN: -18 | ARMOR PENALTY: -5
+Tradeoff: Massive damage and knockback, high energy cost
+Icon: Vertical circle blade
+
+4. LIFTER FORK
+Description: "Low hydraulic fork that flips enemies upside down."
+3D Visual: Wide flat stainless steel fork arms extending from front at ground level, chrome hydraulic rams visible underneath, fork tips slightly upturned, worn from floor scraping
+POWER: 55 | SPEED PENALTY: -5 | ENERGY DRAIN: -5 | ARMOR PENALTY: 0
+Tradeoff: Low damage but disables opponents
+Icon: Fork lift
+
+5. FLAIL CHAIN
+Description: "Whipping steel chain with a spiked ball. Unpredictable and terrifying."
+3D Visual: Chain launcher mechanism on front, heavy steel chain links, large spiked metal ball at end, chain shows motion blur when swinging, contact sparks emitted
+POWER: 75 | SPEED PENALTY: -10 | ENERGY DRAIN: -10 | ARMOR PENALTY: 0
+Tradeoff: Good damage, hard to aim
+Icon: Chain ball
+
+6. CRUSHER CLAW
+Description: "Hydraulic claw that grabs and crushes opponents from above."
+3D Visual: Two massive industrial pincer arms extending forward, serrated inner crushing edges, reinforced steel joint hinges, hydraulic lines running to each arm, oil stains visible
+POWER: 80 | SPEED PENALTY: -15 | ENERGY DRAIN: -12 | ARMOR PENALTY: 0
+Tradeoff: Can immobilize and crush simultaneously
+Icon: Claw
+
+7. HORIZONTAL SPINNER
+Description: "Low-riding horizontal blade bar. Shreds wheels and bottom armor."
+3D Visual: Wide spinning two-ended blade bar at floor level, titanium bar with sharpened ends, mounted on low spinner motor, deep gouges in blade ends from previous fights
+POWER: 88 | SPEED PENALTY: -18 | ENERGY DRAIN: -18 | ARMOR PENALTY: -8
+Tradeoff: Floor-level destruction but energy hungry
+Icon: Horizontal bar spin
+
+8. SPIKE RAMROD
+Description: "Fixed forward spike for pure charge attacks. Simple and brutal."
+3D Visual: Solid tungsten spike mounted centrally to front of chassis, no moving parts, heavily scarred and chipped tip from impacts, thick base mounting plate, simple and brutal design
+POWER: 65 | SPEED PENALTY: 0 | ENERGY DRAIN: 0 | ARMOR PENALTY: 0
+Tradeoff: No energy cost — only effective at high speed
+Icon: Spike arrow
+
+9. PNEUMATIC LANCE
+Description: "Compressed air spike that fires on contact. Punches through armor."
+3D Visual: Telescoping steel lance barrel, silver compressed air canister mounted on side, burst exhaust vents around barrel, lance tip shows armor-piercing hardened point
+POWER: 78 | SPEED PENALTY: -8 | ENERGY DRAIN: -10 | ARMOR PENALTY: 0
+Tradeoff: Penetrates armor plating effectively
+Icon: Lance
+
+10. DRUM SPINNER
+Description: "Rotating drum that chews into opponents continuously on contact."
+3D Visual: Large horizontal cylinder with raised rectangular metal teeth around full circumference, tight low-profile mounting bracket, drum shows metal shaving residue, continuous rotation
+POWER: 82 | SPEED PENALTY: -12 | ENERGY DRAIN: -16 | ARMOR PENALTY: -5
+Tradeoff: Continuous damage output but constant energy drain
+Icon: Drum cylinder
+
+11. WEDGE SLICER
+Description: "Razor-edged wedge that slides under opponents and tips them."
+3D Visual: Ultra-low angled wedge ramp, mirror-polished razor-sharp leading edge, titanium alloy construction, front edge literally scrapes floor, pure geometric simplicity
+POWER: 50 | SPEED PENALTY: 0 | ENERGY DRAIN: 0 | ARMOR PENALTY: 0
+Tradeoff: Zero cost — works best combined with fast chassis
+Icon: Wedge ramp
+
+12. PLASMA TORCH
+Description: "Cutting torch that burns through armor over sustained contact."
+3D Visual: Front-mounted array of 3 torch nozzles, visible blue plasma flame constantly burning, heat shimmer distortion around nozzles, scorched black marks on chassis around mount
+POWER: 70 | SPEED PENALTY: -5 | ENERGY DRAIN: -22 | ARMOR PENALTY: 0
+Tradeoff: Ignores armor rating — burns through everything but drains energy fast
+Icon: Flame
+
+═══════════════════════════════════════════════════════════
+CATEGORY 3 - DEFENSE ARMOR PLATING (12 components):
+═══════════════════════════════════════════════════════════
+
+1. TITANIUM SHELL
+Description: "Full-body titanium wrap. Extremely tough, adds significant weight."
+3D Visual: Seamless curved titanium plates wrapping entire chassis body, brushed silver metallic finish, subtle surface grain texture, no visible fasteners — looks factory sealed
+ARMOR BONUS: +40 | SPEED PENALTY: -20 | ENERGY PENALTY: -15 | POWER PENALTY: 0
+Tradeoff: Best all-round protection but kills mobility
+Icon: Full shield
+
+2. REACTIVE PANELS
+Description: "Explosive-reactive plates detonate on impact to absorb hits."
+3D Visual: Square tiled panels covering body surface, each panel has a small red LED charge indicator light, panel edges show scorch marks from previous detonations, modular bolt-on look
+ARMOR BONUS: +35 | SPEED PENALTY: -10 | ENERGY PENALTY: -20 | POWER PENALTY: 0
+Tradeoff: Absorbs big hits but drains energy reserve
+Icon: Explosion shield
+
+3. CARBON WEAVE
+Description: "Lightweight carbon fiber mesh. Minimal protection, maximum agility."
+3D Visual: Woven carbon fiber texture visible across all surfaces, thin black mesh panels, weave pattern clearly visible, lightweight look, some panels have stress fractures showing use
+ARMOR BONUS: +15 | SPEED PENALTY: -2 | ENERGY PENALTY: -5 | POWER PENALTY: 0
+Tradeoff: Almost no weight — ideal for speed builds
+Icon: Mesh grid
+
+4. CERAMIC COMPOSITE
+Description: "Heat-resistant ceramic tiles. Absorbs energy weapons and fire."
+3D Visual: White hexagonal ceramic tiles arranged across body like spacecraft heat shield, slight amber heat glow on tile edges, some tiles cracked from thermal stress, NASA shuttle aesthetic
+ARMOR BONUS: +30 | SPEED PENALTY: -12 | ENERGY PENALTY: -10 | POWER PENALTY: 0
+Tradeoff: Excellent vs flame and plasma weapons
+Icon: Hex tiles
+
+5. STEEL FORTRESS WRAP
+Description: "Thick rolled steel plating welded on all sides. Brute protection."
+3D Visual: Flat heavy steel sheets bolted and welded on every face, thick weld seam lines visible, raw industrial look, surface has hammer dents from testing, bolt heads exposed, very angular
+ARMOR BONUS: +45 | SPEED PENALTY: -28 | ENERGY PENALTY: -20 | POWER PENALTY: -5
+Tradeoff: Maximum armor bonus but cripples speed
+Icon: Steel plates
+
+6. ABLATIVE FOAM COAT
+Description: "Energy-absorbing foam. Cheap but effective against spinners."
+3D Visual: Chunky rectangular foam blocks covering exterior, dull matte grey, compressed dents where impacts hit, looks soft but industrial grade, foam chunks slightly uneven
+ARMOR BONUS: +20 | SPEED PENALTY: -5 | ENERGY PENALTY: -5 | POWER PENALTY: 0
+Tradeoff: Good against spinners, weak vs crush or pierce
+Icon: Foam block
+
+7. POLYCARBONATE SHIELD
+Description: "Transparent impact shield at front. See the opponent through it."
+3D Visual: Clear transparent polycarbonate panel mounted at front, visible scratches and impact marks across surface, steel mounting frame around edges, you can see through it
+ARMOR BONUS: +25 | SPEED PENALTY: -8 | ENERGY PENALTY: -8 | POWER PENALTY: 0
+Tradeoff: Front-only protection, sides remain vulnerable
+Icon: Clear shield
+
+8. SELF-HEALING POLYMER
+Description: "Smart material that slowly repairs fractures during combat."
+3D Visual: Slightly translucent rubbery skin layer over chassis, glowing blue-green repair fluid veins visible under surface, fluid pulses slowly, living organic look
+ARMOR BONUS: +22 | SPEED PENALTY: -6 | ENERGY PENALTY: -25 | POWER PENALTY: 0
+Tradeoff: Regenerates armor over time but drains energy constantly
+Icon: Healing cross
+
+9. CHAIN MAIL SKIRT
+Description: "Steel chain curtain protecting wheels and underside."
+3D Visual: Draped chainmail hanging around full perimeter of chassis, individual chain links visible, rattles with movement, steel rings show oxidation and rust spots, medieval meets industrial
+ARMOR BONUS: +18 | SPEED PENALTY: -10 | ENERGY PENALTY: -3 | POWER PENALTY: 0
+Tradeoff: Excellent underbelly protection, adds weight
+Icon: Chain links
+
+10. DEFLECTOR WEDGE ARMOR
+Description: "Angled front armor designed to deflect attacks upward."
+3D Visual: Steeply angled front ramp plate at 45 degrees, mirror-polished to maximum slipperiness, steel mounting struts underneath, leading edge shows weapon impact gouges
+ARMOR BONUS: +28 | SPEED PENALTY: -8 | ENERGY PENALTY: -5 | POWER PENALTY: 0
+Tradeoff: Deflects spinners effectively, weaker on rear
+Icon: Deflect arrow
+
+11. NANO-CERAMIC COAT
+Description: "Microscopic ceramic layer. Almost invisible but surprisingly resilient."
+3D Visual: Iridescent rainbow sheen over entire chassis surface, changes color with viewing angle like oil on water, almost looks like no armor at all, subtle but clearly high-tech
+ARMOR BONUS: +12 | SPEED PENALTY: 0 | ENERGY PENALTY: -8 | POWER PENALTY: 0
+Tradeoff: Zero weight penalty — best for speed builds needing some protection
+Icon: Sparkle coat
+
+12. IRON FORTRESS SHELL
+Description: "Triple-layered iron plating. Heaviest defense available. A walking tank."
+3D Visual: Three clearly visible separate layers of iron plating stacked on all faces, exposed rivet heads on each layer, heavy dents and scratches from weapons testing, looks immovable
+ARMOR BONUS: +50 | SPEED PENALTY: -35 | ENERGY PENALTY: -25 | POWER PENALTY: -10
+Tradeoff: Highest armor in game — bot becomes nearly immobile
+Icon: Triple layer shield
+
+═══════════════════════════════════════════════════════════
+CATEGORY 7 - SECONDARY WEAPON UTILITY (12 components):
+═══════════════════════════════════════════════════════════
+
+1. FLAMETHROWER
+Description: "Short-range napalm burst. Lights opponents on fire and disorients."
+3D Visual: Two side-mounted metal nozzles, visible cylindrical fuel tanks bolted to sides, burn scorch marks around nozzle edges, orange flame burst effect when firing, heat shimmer
+POWER BONUS: +20 | SPEED PENALTY: -5 | ENERGY DRAIN: -18 | SPECIAL: Burns over time
+Tradeoff: Ongoing fire damage but burns energy fast
+Icon: Fire
+
+2. EMP PULSE
+Description: "Electromagnetic burst that disables opponent drive system temporarily."
+3D Visual: Circular antenna array mounted on top of chassis, multiple copper coil rings, electric blue discharge rings visible on activation, lightning arc between antenna tips
+POWER BONUS: +15 | SPEED PENALTY: 0 | ENERGY DRAIN: -25 | SPECIAL: Disables enemy 3 seconds
+Tradeoff: Devastating effect — enormous energy cost
+Icon: Lightning circle
+
+3. SMOKE SCREEN
+Description: "Thick smoke canister. Disorients opponent and hides position."
+3D Visual: Rear-mounted twin cylindrical smoke tubes, dense black smoke cloud effect on deploy, tubes show heat discoloration, exhaust vents with carbon buildup residue
+POWER BONUS: 0 | SPEED PENALTY: 0 | ENERGY DRAIN: -5 | SPECIAL: -30% opponent accuracy
+Tradeoff: Zero power cost — only useful against targeting systems
+Icon: Cloud smoke
+
+4. SELF-RIGHTING ARM
+Description: "Hydraulic arm that flips bot upright if overturned."
+3D Visual: Extendable carbon fiber arm folded flat on top of chassis, silver hydraulic piston, auto-trigger sensor light visible, arm extends dramatically when deployed
+POWER BONUS: 0 | SPEED PENALTY: -5 | ENERGY DRAIN: -8 | SPECIAL: Survives being flipped
+Tradeoff: Defensive survival utility — saves fights but adds weight
+Icon: Rotate arrow
+
+5. SAWBLADE SIDE MOUNT
+Description: "Spinning circular saw on side arm. Attacks while driving past."
+3D Visual: Circular saw blade mounted on extending lateral steel arm on left side, carbide-tipped teeth, arm extends outward during combat, metal dust and sparks spray on contact
+POWER BONUS: +30 | SPEED PENALTY: -12 | ENERGY DRAIN: -16 | SPECIAL: Side attack range
+Tradeoff: Adds sideways damage capability but heavy penalty
+Icon: Saw circle
+
+6. NET LAUNCHER
+Description: "Fires tangling net that wraps opponent weapons and wheels."
+3D Visual: Compressed air cannon barrel on front, folded metallic net visible in barrel mouth, pressurized air canister alongside barrel, net has weighted corners to spread on launch
+POWER BONUS: +10 | SPEED PENALTY: 0 | ENERGY DRAIN: -8 | SPECIAL: Immobilizes weapon 5 seconds
+Tradeoff: Situational but completely neutralizes spinners
+Icon: Net grid
+
+7. SPIKE MINE DROPPER
+Description: "Drops spiked mines behind bot that damage pursuers."
+3D Visual: Rear-mounted angular chute mechanism, small star-shaped spiked disc mines visible in chute, pressure-trigger fuse on each mine, mines show metallic glint
+POWER BONUS: +25 | SPEED PENALTY: -3 | ENERGY DRAIN: -10 | SPECIAL: Area denial damage
+Tradeoff: Passive damage dealer — mines are limited
+Icon: Star mine
+
+8. WEDGE RAM
+Description: "Secondary front wedge that lifts and destabilizes on contact."
+3D Visual: Secondary low-angle wedge plate mounted in front independent of primary weapon, separate hydraulic mount visible, polished leading edge, can deploy independently
+POWER BONUS: +15 | SPEED PENALTY: -8 | ENERGY DRAIN: -5 | SPECIAL: Opponent loses traction
+Tradeoff: Cheap energy cost — only useful up close
+Icon: Wedge ramp
+
+9. TASER PRONGS
+Description: "Electrified prongs that shock and stall opponent motors."
+3D Visual: Two forward-facing copper electrode prongs extending from front, visible electrical arc crackling between tips, rubber insulation grip bases, blue plasma electricity effect
+POWER BONUS: +18 | SPEED PENALTY: 0 | ENERGY DRAIN: -12 | SPECIAL: Slows opponent -20% speed
+Tradeoff: Applies speed debuff to enemy on contact
+Icon: Electric bolt prongs
+
+10. DRILL ATTACHMENT
+Description: "Forward drill bit that bores through plating on sustained contact."
+3D Visual: Industrial cone drill bit mounted centrally on front, rotating spiral fluted tip, tungsten carbide cutting surface, metal shaving residue around drill base, oil coolant stains
+POWER BONUS: +35 | SPEED PENALTY: -15 | ENERGY DRAIN: -18 | SPECIAL: Ignores 50% opponent armor
+Tradeoff: Best armor-piercing secondary — heavy cost
+Icon: Drill spiral
+
+11. GRINDER WHEEL
+Description: "Side abrasive wheel that wears down opponent plating on contact."
+3D Visual: Rough grinding disc mounted on right side on short steel arm, abrasive surface texture like industrial grinder, metal powder and sparks spray outward during contact
+POWER BONUS: +22 | SPEED PENALTY: -8 | ENERGY DRAIN: -12 | SPECIAL: -10 opponent armor per hit
+Tradeoff: Degrades enemy armor over multiple contacts
+Icon: Grind wheel
+
+12. CONCUSSION CANNON
+Description: "Single-shot compressed air cannon. Knocks opponent across arena."
+3D Visual: Large cylindrical barrel cannon mounted on top center, analog pressure gauge visible on side, heavy recoil dampener springs visible at barrel base, single massive bore opening
+POWER BONUS: +40 | SPEED PENALTY: -10 | ENERGY DRAIN: -25 | SPECIAL: Massive knockback into walls
+Tradeoff: Highest knockback in game — single use per fight
+Icon: Cannon blast

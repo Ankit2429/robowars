@@ -1,0 +1,280 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Robo Arena API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: rooms
+    description: Battle room management
+  - name: robots
+    description: Robot build management
+  - name: leaderboard
+    description: Leaderboard and stats
+  - name: parts
+    description: Robot parts catalog
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /parts:
+    get:
+      operationId: listParts
+      tags: [parts]
+      summary: List all available robot parts
+      responses:
+        "200":
+          description: List of parts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RobotPart"
+
+  /robots:
+    get:
+      operationId: listRobots
+      tags: [robots]
+      summary: List all saved robot builds
+      responses:
+        "200":
+          description: List of robots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Robot"
+    post:
+      operationId: createRobot
+      tags: [robots]
+      summary: Save a robot build
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RobotInput"
+      responses:
+        "201":
+          description: Robot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Robot"
+
+  /robots/{id}:
+    get:
+      operationId: getRobot
+      tags: [robots]
+      summary: Get a specific robot build
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Robot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Robot"
+        "404":
+          description: Not found
+
+  /rooms:
+    get:
+      operationId: listRooms
+      tags: [rooms]
+      summary: List open battle rooms
+      responses:
+        "200":
+          description: List of rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a new battle room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [leaderboard]
+      summary: Get top players leaderboard
+      responses:
+        "200":
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    RobotPart:
+      type: object
+      required: [id, name, category, stats, color, description]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [body, attack, defense]
+        stats:
+          $ref: "#/components/schemas/PartStats"
+        color:
+          type: string
+        description:
+          type: string
+        specialAbility:
+          type: ["string", "null"]
+
+    PartStats:
+      type: object
+      required: [armor, power, speed, energy]
+      properties:
+        armor:
+          type: integer
+        power:
+          type: integer
+        speed:
+          type: integer
+        energy:
+          type: integer
+
+    Robot:
+      type: object
+      required: [id, name, playerName, bodyPartId, attackPartId, defensePartId, totalStats, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        playerName:
+          type: string
+        bodyPartId:
+          type: string
+        attackPartId:
+          type: string
+        defensePartId:
+          type: string
+        totalStats:
+          $ref: "#/components/schemas/PartStats"
+        specialAbility:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RobotInput:
+      type: object
+      required: [name, playerName, bodyPartId, attackPartId, defensePartId]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        playerName:
+          type: string
+          minLength: 1
+        bodyPartId:
+          type: string
+        attackPartId:
+          type: string
+        defensePartId:
+          type: string
+
+    Room:
+      type: object
+      required: [id, name, status, playerCount, maxPlayers, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [waiting, fighting, finished]
+        playerCount:
+          type: integer
+        maxPlayers:
+          type: integer
+        createdAt:
+          type: string
+        hostName:
+          type: ["string", "null"]
+
+    RoomInput:
+      type: object
+      required: [name, hostName]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        hostName:
+          type: string
+          minLength: 1
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, playerName, wins, losses, winRate, totalBattles]
+      properties:
+        rank:
+          type: integer
+        playerName:
+          type: string
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        totalBattles:
+          type: integer
+        favoriteRobot:
+          type: ["string", "null"]

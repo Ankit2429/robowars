@@ -1,0 +1,217 @@
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X } from "lucide-react";
+import { io, Socket } from "socket.io-client";
+
+interface StoredRobot {
+  playerName: string;
+  robotName: string;
+  bodyColor: string;
+  attackColor: string;
+  defenseColor: string;
+  stats: { armor: number; power: number; speed: number; energy: number };
+}
+
+export default function Play() {
+  const [, setLocation] = useLocation();
+  const [myRobot, setMyRobot] = useState<StoredRobot | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchTime, setSearchTime] = useState(0);
+  const [found, setFound] = useState<{ opponentName: string; roomId: string } | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("roboArena_robot");
+    if (saved) setMyRobot(JSON.parse(saved));
+  }, []);
+
+  // Search timer
+  useEffect(() => {
+    if (searching) {
+      timerRef.current = setInterval(() => setSearchTime(t => t + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setSearchTime(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [searching]);
+
+  const handleFindMatch = () => {
+    if (!myRobot) return;
+    setSearching(true);
+
+    const socket = io(import.meta.env.BASE_URL.replace(/\/$/, ""), {
+      path: `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/socket.io`,
+      transports: ["websocket", "polling"],
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("findMatch", { playerName: myRobot.playerName, robotId: null });
+    });
+
+    socket.on("matchFound", ({ roomId, opponentName }: { roomId: string; opponentName: string }) => {
+      setFound({ roomId, opponentName });
+      setSearching(false);
+
+      setTimeout(() => {
+        socket.disconnect();
+        setLocation(`/battle/${roomId}`);
+      }, 2000);
+    });
+
+    socket.on("matchSearching", () => {
+      // Still waiting, keep spinner
+    });
+
+    socket.on("connect_error", () => {
+      setSearching(false);
+      socket.disconnect();
+    });
+  };
+
+  const handleCancel = () => {
+    socketRef.current?.emit("cancelMatch");
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+    setSearching(false);
+  };
+
+  const handleAITraining = () => {
+    setLocation("/battle/ai");
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px]" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 w-full max-w-2xl"
+      >
+        {/* Header */}
+        <div className="text-center mb-10">
+          <h1 className="text-5xl md:text-6xl font-black font-display tracking-widest text-white mb-2">
+            ENTER <span className="text-primary">COMBAT</span>
+          </h1>
+          <p className="font-mono text-muted-foreground tracking-widest text-sm">CHOOSE YOUR BATTLE MODE</p>
+        </div>
+
+        {/* Robot preview */}
+        {myRobot ? (
+          <div className="brutal-border bg-card p-4 mb-8 flex items-center gap-4">
+            {/* Color swatch mini-robot */}
+            <div className="flex gap-1 shrink-0">
+              <div className="w-4 h-10 rounded-sm" style={{ backgroundColor: myRobot.bodyColor }} />
+              <div className="w-4 h-8 rounded-sm mt-1" style={{ backgroundColor: myRobot.attackColor }} />
+              <div className="w-4 h-8 rounded-sm mt-1" style={{ backgroundColor: myRobot.defenseColor }} />
+            </div>
+            <div className="flex-1">
+              <div className="font-display text-xl text-white font-bold tracking-widest">{myRobot.robotName}</div>
+              <div className="font-mono text-xs text-muted-foreground">PILOT: {myRobot.playerName}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono text-right">
+              <span className="text-muted-foreground">PWR</span><span className="text-white">{myRobot.stats.power}</span>
+              <span className="text-muted-foreground">SPD</span><span className="text-white">{myRobot.stats.speed}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="brutal-border bg-card/50 p-6 mb-8 text-center">
+            <Cpu className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="font-mono text-muted-foreground text-sm mb-3">No robot found. Build one first.</p>
+            <button onClick={() => setLocation("/builder")} className="brutal-button px-6 py-2 text-sm text-primary border-primary">
+              BUILD ROBOT
+            </button>
+          </div>
+        )}
+
+        {/* Mode buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Find Match */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleFindMatch}
+            disabled={!myRobot || searching || !!found}
+            className="brutal-border bg-primary/10 border-primary p-8 flex flex-col items-center gap-4 hover:bg-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            <div className="w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center shadow-[0_0_20px_rgba(255,69,0,0.4)] group-hover:shadow-[0_0_30px_rgba(255,69,0,0.7)] transition-all">
+              <Wifi className="h-8 w-8 text-primary" />
+            </div>
+            <div className="text-center">
+              <div className="font-display text-2xl font-bold text-white tracking-widest">FIND MATCH</div>
+              <div className="font-mono text-xs text-muted-foreground mt-1">RANKED ONLINE BATTLE</div>
+            </div>
+          </motion.button>
+
+          {/* AI Training */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleAITraining}
+            disabled={!myRobot}
+            className="brutal-border bg-secondary/10 border-secondary p-8 flex flex-col items-center gap-4 hover:bg-secondary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            <div className="w-16 h-16 rounded-full border-2 border-secondary flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.4)] group-hover:shadow-[0_0_30px_rgba(0,255,255,0.7)] transition-all">
+              <Bot className="h-8 w-8 text-secondary" />
+            </div>
+            <div className="text-center">
+              <div className="font-display text-2xl font-bold text-white tracking-widest">AI TRAINING</div>
+              <div className="font-mono text-xs text-muted-foreground mt-1">FIGHT CPU OPPONENT</div>
+            </div>
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Searching overlay */}
+      <AnimatePresence>
+        {(searching || found) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center"
+          >
+            <div className="brutal-border bg-card p-12 flex flex-col items-center gap-6 min-w-[320px]">
+              {found ? (
+                <>
+                  <Swords className="h-16 w-16 text-primary animate-pulse" />
+                  <div className="text-center">
+                    <p className="font-mono text-xs text-muted-foreground tracking-widest mb-2">OPPONENT FOUND</p>
+                    <p className="font-display text-3xl text-white font-bold">{found.opponentName}</p>
+                  </div>
+                  <p className="font-mono text-primary text-sm animate-pulse">ENTERING ARENA...</p>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                    <Wifi className="h-8 w-8 text-primary absolute inset-0 m-auto" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display text-2xl text-white font-bold tracking-widest">SEARCHING</p>
+                    <p className="font-mono text-muted-foreground text-sm mt-1">
+                      {Math.floor(searchTime / 60).toString().padStart(2,"0")}:{(searchTime % 60).toString().padStart(2,"0")}
+                    </p>
+                  </div>
+                  <p className="font-mono text-xs text-muted-foreground text-center">Waiting for an opponent...</p>
+                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2">
+                    <X className="h-4 w-4" /> CANCEL
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
