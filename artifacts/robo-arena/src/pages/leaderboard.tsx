@@ -80,11 +80,12 @@ export default function Leaderboard() {
                   <div className="font-mono text-xs w-12 text-right">
                     {(entry.winRate * 100).toFixed(1)}%
                   </div>
-                  <Progress 
-                    value={entry.winRate * 100} 
-                    className="h-2 w-full bg-muted" 
-                    indicatorClassName={entry.winRate > 0.6 ? "bg-secondary" : entry.winRate > 0.4 ? "bg-primary" : "bg-destructive"}
-                  />
+                  <div className="h-2 w-full bg-[#222] rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${entry.winRate > 0.6 ? "bg-secondary" : entry.winRate > 0.4 ? "bg-primary" : "bg-destructive"}`} 
+                      style={{ width: `${entry.winRate * 100}%` }}
+                    />
+                  </div>
                 </div>
                 
                 <div className="col-span-2 text-right font-mono text-xs text-muted-foreground truncate">

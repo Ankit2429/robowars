@@ -16,6 +16,7 @@ export const RobotPartCategory = {
   body: "body",
   attack: "attack",
   defense: "defense",
+  secondary: "secondary",
 } as const;
 
 export interface PartStats {
@@ -43,6 +44,8 @@ export interface Robot {
   bodyPartId: string;
   attackPartId: string;
   defensePartId: string;
+  /** @nullable */
+  secondaryWeaponId?: string | null;
   totalStats: PartStats;
   /** @nullable */
   specialAbility?: string | null;
@@ -57,6 +60,8 @@ export interface RobotInput {
   bodyPartId: string;
   attackPartId: string;
   defensePartId: string;
+  /** @nullable */
+  secondaryWeaponId?: string | null;
 }
 
 export type RoomStatus = (typeof RoomStatus)[keyof typeof RoomStatus];

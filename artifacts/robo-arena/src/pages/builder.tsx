@@ -15,58 +15,78 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
 
-// ── 3-D vehicle weapon attachment ─────────────────────────────────────────────
+
+
+// ── 3-D secondary weapon attachment ──────────────────────────────────────────
+function SecondaryWeapon3D({ defColor, name }: { defColor: string; name: string }) {
+  const isCrossbow = name.toLowerCase().includes("crossbow");
+  const isRocket = name.toLowerCase().includes("rocket") || name.toLowerCase().includes("harpoon");
+  const isTail = name.toLowerCase().includes("tail");
+
+  if (isCrossbow) {
+    return (
+      <group position={[0, 1.2, -0.4]}>
+        <mesh rotation={[0, Math.PI/4, 0]} castShadow><boxGeometry args={[1.6, 0.2, 0.2]} /><meshStandardMaterial color={defColor} /></mesh>
+        <mesh rotation={[0, -Math.PI/4, 0]} castShadow><boxGeometry args={[1.6, 0.2, 0.2]} /><meshStandardMaterial color={defColor} /></mesh>
+      </group>
+    );
+  }
+  if (isRocket) {
+    return (
+      <group position={[0, 1.2, -0.4]}>
+        <mesh rotation={[-0.2, 0, 0]} castShadow><boxGeometry args={[1.2, 0.6, 0.8]} /><meshStandardMaterial color={defColor} /></mesh>
+      </group>
+    );
+  }
+  if (isTail) {
+    return (
+      <group position={[0, 1.2, -1.0]}>
+        <mesh rotation={[0.4, 0, 0]} castShadow><boxGeometry args={[0.3, 1.0, 0.3]} /><meshStandardMaterial color={defColor} /></mesh>
+      </group>
+    );
+  }
+  // Default turret
+  return (
+    <group position={[0, 1.2, -0.4]}>
+      <mesh castShadow><boxGeometry args={[0.6, 0.4, 0.6]} /><meshStandardMaterial color={defColor} /></mesh>
+      <mesh position={[0, 0, 0.6]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color="#333" /></mesh>
+    </group>
+  );
+}
+
+// ── 3-D weapon attachments ─────────────────────────────────────────────────────
 function VehicleWeapon({ atkColor, name }: { atkColor: string; name: string }) {
-  const lc = name.toLowerCase();
-  const isCannon = lc.includes("cannon") || lc.includes("plasma") || lc.includes("rocket");
-  const isSaw    = lc.includes("saw");
-
-  if (isCannon) {
+  const isDrill = name.toLowerCase().includes("drill");
+  const isPincer = name.toLowerCase().includes("bite");
+  const isRoller = name.toLowerCase().includes("horn") || name.toLowerCase().includes("spin blade");
+  
+  if (isDrill) {
     return (
-      <group position={[0, 0.44, 1.7]}>
+      <group position={[0, 0.32, 1.8]}>
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.15, 0.21, 1.35, 12]} />
-          <meshStandardMaterial color={atkColor} metalness={0.3} roughness={0.3}
-            emissive={atkColor} emissiveIntensity={0.75} />
-        </mesh>
-        <mesh position={[0, 0.68, 0]}>
-          <sphereGeometry args={[0.21, 12, 12]} />
-          <meshBasicMaterial color={atkColor} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-          <cylinderGeometry args={[0.22, 0.22, 0.55, 8]} />
-          <meshStandardMaterial color={atkColor} metalness={0.4} roughness={0.4}
-            emissive={atkColor} emissiveIntensity={0.4} />
+          <coneGeometry args={[0.5, 1.2, 8]} />
+          <meshStandardMaterial color={atkColor} metalness={0.4} roughness={0.35} emissive={atkColor} emissiveIntensity={0.5} />
         </mesh>
       </group>
     );
   }
-
-  if (isSaw) {
+  if (isPincer) {
     return (
-      <group position={[0, 0.36, 1.65]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.6, 0.6, 0.16, 20]} />
-          <meshStandardMaterial color={atkColor} metalness={0.2} roughness={0.2}
-            emissive={atkColor} emissiveIntensity={0.9} />
-        </mesh>
-        {Array.from({ length: 10 }).map((_, i) => (
-          <mesh key={i}
-            position={[Math.cos(i * Math.PI / 5) * 0.61, 0, Math.sin(i * Math.PI / 5) * 0.61]}
-            rotation={[0, i * Math.PI / 5, 0]}
-          >
-            <boxGeometry args={[0.2, 0.16, 0.18]} />
-            <meshStandardMaterial color={atkColor} emissive={atkColor} emissiveIntensity={1.0} />
-          </mesh>
-        ))}
-        <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.18, 0.18, 0.2, 8]} />
-          <meshStandardMaterial color="#222" metalness={0.9} roughness={0.2} />
-        </mesh>
+      <group position={[0, 0.32, 1.6]}>
+        <mesh position={[-0.4, 0, 0]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color={atkColor} /></mesh>
+        <mesh position={[0.4, 0, 0]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color={atkColor} /></mesh>
+      </group>
+    );
+  }
+  if (isRoller) {
+    return (
+      <group position={[0, 0.32, 1.8]}>
+        <mesh rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.3, 0.3, 1.6, 8]} /><meshStandardMaterial color={atkColor} /></mesh>
       </group>
     );
   }
 
+  // Default wedge/lifter
   return (
     <group position={[0, 0.32, 1.52]}>
       <mesh position={[0, 0.04, -0.12]} castShadow>
@@ -86,8 +106,8 @@ function VehicleWeapon({ atkColor, name }: { atkColor: string; name: string }) {
 }
 
 // ── 3-D vehicle robot preview ──────────────────────────────────────────────────
-function RobotMesh({ bodyPart, attackPart, defensePart }: {
-  bodyPart?: RobotPart; attackPart?: RobotPart; defensePart?: RobotPart;
+function RobotMesh({ bodyPart, attackPart, defensePart, secondaryPart }: {
+  bodyPart?: RobotPart; attackPart?: RobotPart; defensePart?: RobotPart; secondaryPart?: RobotPart;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -167,6 +187,9 @@ function RobotMesh({ bodyPart, attackPart, defensePart }: {
         </group>
       ))}
       <VehicleWeapon atkColor={atkColor} name={attackPart?.name || ""} />
+      {secondaryPart && (
+        <SecondaryWeapon3D defColor={secondaryPart.color || "#ffaa00"} name={secondaryPart.name} />
+      )}
       {isShield ? (
         <>
           {([-1.28, 1.28] as const).map((x, i) => (
@@ -226,42 +249,47 @@ export default function Builder() {
   const { data: parts, isLoading: partsLoading } = useListParts();
   const createRobot = useCreateRobot();
 
-  const [activeTab, setActiveTab] = useState<"body" | "attack" | "defense" | "finalize">("body");
-  const [selectedBodyId, setSelectedBodyId]       = useState<string>("");
-  const [selectedAttackId, setSelectedAttackId]   = useState<string>("");
-  const [selectedDefenseId, setSelectedDefenseId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"body" | "attack" | "secondary" | "defense" | "finalize">("body");
+  const [selectedBodyId, setSelectedBodyId]             = useState<string>("");
+  const [selectedAttackId, setSelectedAttackId]         = useState<string>("");
+  const [selectedSecondaryId, setSelectedSecondaryId]   = useState<string>("");
+  const [selectedDefenseId, setSelectedDefenseId]       = useState<string>("");
   const [robotName, setRobotName] = useState("");
   const [forgeError, setForgeError] = useState("");
 
-  const bodyParts    = useMemo(() => parts?.filter(p => p.category === "body")    || [], [parts]);
-  const attackParts  = useMemo(() => parts?.filter(p => p.category === "attack")  || [], [parts]);
-  const defenseParts = useMemo(() => parts?.filter(p => p.category === "defense") || [], [parts]);
+  const bodyParts      = useMemo(() => parts?.filter(p => p.category === "body")      || [], [parts]);
+  const attackParts    = useMemo(() => parts?.filter(p => p.category === "attack")    || [], [parts]);
+  const secondaryParts = useMemo(() => parts?.filter(p => p.category === "secondary") || [], [parts]);
+  const defenseParts   = useMemo(() => parts?.filter(p => p.category === "defense")   || [], [parts]);
 
   if (!selectedBodyId    && bodyParts.length    > 0) setSelectedBodyId(bodyParts[0].id);
   if (!selectedAttackId  && attackParts.length  > 0) setSelectedAttackId(attackParts[0].id);
+  if (!selectedSecondaryId && secondaryParts.length > 0) setSelectedSecondaryId(secondaryParts[0].id);
   if (!selectedDefenseId && defenseParts.length > 0) setSelectedDefenseId(defenseParts[0].id);
 
-  const selectedBody    = bodyParts.find(p => p.id === selectedBodyId);
-  const selectedAttack  = attackParts.find(p => p.id === selectedAttackId);
-  const selectedDefense = defenseParts.find(p => p.id === selectedDefenseId);
+  const selectedBody      = bodyParts.find(p => p.id === selectedBodyId);
+  const selectedAttack    = attackParts.find(p => p.id === selectedAttackId);
+  const selectedSecondary = secondaryParts.find(p => p.id === selectedSecondaryId);
+  const selectedDefense   = defenseParts.find(p => p.id === selectedDefenseId);
 
   const totalStats = useMemo(() => ({
-    armor:  (selectedBody?.stats.armor  || 0) + (selectedAttack?.stats.armor  || 0) + (selectedDefense?.stats.armor  || 0),
-    power:  (selectedBody?.stats.power  || 0) + (selectedAttack?.stats.power  || 0) + (selectedDefense?.stats.power  || 0),
-    speed:  (selectedBody?.stats.speed  || 0) + (selectedAttack?.stats.speed  || 0) + (selectedDefense?.stats.speed  || 0),
-    energy: (selectedBody?.stats.energy || 0) + (selectedAttack?.stats.energy || 0) + (selectedDefense?.stats.energy || 0),
-  }), [selectedBody, selectedAttack, selectedDefense]);
+    armor:  (selectedBody?.stats.armor  || 0) + (selectedAttack?.stats.armor  || 0) + (selectedSecondary?.stats.armor  || 0) + (selectedDefense?.stats.armor  || 0),
+    power:  (selectedBody?.stats.power  || 0) + (selectedAttack?.stats.power  || 0) + (selectedSecondary?.stats.power  || 0) + (selectedDefense?.stats.power  || 0),
+    speed:  (selectedBody?.stats.speed  || 0) + (selectedAttack?.stats.speed  || 0) + (selectedSecondary?.stats.speed  || 0) + (selectedDefense?.stats.speed  || 0),
+    energy: (selectedBody?.stats.energy || 0) + (selectedAttack?.stats.energy || 0) + (selectedSecondary?.stats.energy || 0) + (selectedDefense?.stats.energy || 0),
+  }), [selectedBody, selectedAttack, selectedSecondary, selectedDefense]);
 
-  const bodyCost    = selectedBody    ? calcPartCost("body",    selectedBody.stats)    : 0;
-  const attackCost  = selectedAttack  ? calcPartCost("attack",  selectedAttack.stats)  : 0;
-  const defenseCost = selectedDefense ? calcPartCost("defense", selectedDefense.stats) : 0;
-  const totalCost   = bodyCost + attackCost + defenseCost;
-  const canAfford   = (session?.points ?? 0) >= totalCost;
+  const bodyCost      = selectedBody      ? calcPartCost("body",      selectedBody.stats)      : 0;
+  const attackCost    = selectedAttack    ? calcPartCost("attack",    selectedAttack.stats)    : 0;
+  const secondaryCost = selectedSecondary ? calcPartCost("secondary", selectedSecondary.stats) : 0;
+  const defenseCost   = selectedDefense   ? calcPartCost("defense",   selectedDefense.stats)   : 0;
+  const totalCost     = bodyCost + attackCost + secondaryCost + defenseCost;
+  const canAfford     = (session?.points ?? 0) >= totalCost;
 
   const handleForge = (e: React.FormEvent) => {
     e.preventDefault();
     setForgeError("");
-    if (!robotName || !selectedBodyId || !selectedAttackId || !selectedDefenseId) return;
+    if (!robotName || !selectedBodyId || !selectedAttackId || !selectedSecondaryId || !selectedDefenseId) return;
     if (!canAfford) {
       setForgeError(`Not enough points. Need ${totalCost.toLocaleString()} pts, you have ${(session?.points ?? 0).toLocaleString()} pts.`);
       return;
@@ -274,6 +302,7 @@ export default function Builder() {
       robotName,
       bodyPartId: selectedBodyId,
       attackPartId: selectedAttackId,
+      secondaryPartId: selectedSecondaryId,
       defensePartId: selectedDefenseId,
       bodyColor:    selectedBody?.color    || "#556B2F",
       attackColor:  selectedAttack?.color  || "#FF4500",
@@ -285,7 +314,7 @@ export default function Builder() {
     deductPoints(totalCost);
 
     createRobot.mutate(
-      { data: { name: robotName, playerName, bodyPartId: selectedBodyId, attackPartId: selectedAttackId, defensePartId: selectedDefenseId } },
+      { data: { name: robotName, playerName, bodyPartId: selectedBodyId, attackPartId: selectedAttackId, secondaryWeaponId: selectedSecondaryId, defensePartId: selectedDefenseId } },
       {
         onSuccess: (newRobot) => {
           queryClient.invalidateQueries({ queryKey: ["/api/robots"] });
@@ -298,12 +327,13 @@ export default function Builder() {
     setLocation("/play");
   };
 
-  const getPartList   = () => activeTab === "body" ? bodyParts : activeTab === "attack" ? attackParts : activeTab === "defense" ? defenseParts : [];
-  const getSelectedId = () => activeTab === "body" ? selectedBodyId : activeTab === "attack" ? selectedAttackId : selectedDefenseId;
+  const getPartList   = () => activeTab === "body" ? bodyParts : activeTab === "attack" ? attackParts : activeTab === "secondary" ? secondaryParts : activeTab === "defense" ? defenseParts : [];
+  const getSelectedId = () => activeTab === "body" ? selectedBodyId : activeTab === "attack" ? selectedAttackId : activeTab === "secondary" ? selectedSecondaryId : selectedDefenseId;
   const handleSelect  = (id: string) => {
-    if (activeTab === "body")    setSelectedBodyId(id);
-    if (activeTab === "attack")  setSelectedAttackId(id);
-    if (activeTab === "defense") setSelectedDefenseId(id);
+    if (activeTab === "body")      setSelectedBodyId(id);
+    if (activeTab === "attack")    setSelectedAttackId(id);
+    if (activeTab === "secondary") setSelectedSecondaryId(id);
+    if (activeTab === "defense")   setSelectedDefenseId(id);
   };
 
   const getPartCostForList = (part: RobotPart) =>
@@ -342,7 +372,7 @@ export default function Builder() {
                   emissive={selectedBody?.color || "#FF4500"} emissiveIntensity={0.5} />
               </mesh>
               <Float speed={2} rotationIntensity={0.08} floatIntensity={0.18}>
-                <RobotMesh bodyPart={selectedBody} attackPart={selectedAttack} defensePart={selectedDefense} />
+                <RobotMesh bodyPart={selectedBody} attackPart={selectedAttack} defensePart={selectedDefense} secondaryPart={selectedSecondary} />
               </Float>
               <ContactShadows position={[0, 0.1, 0]} opacity={0.6} scale={5} blur={2} far={4} />
               <OrbitControls
@@ -418,10 +448,11 @@ export default function Builder() {
         {/* Tabs */}
         <div className="flex border-b border-border bg-background">
           {[
-            { id: "body",     label: "Chassis"    },
-            { id: "attack",   label: "Weapon"     },
-            { id: "defense",  label: "Defense"    },
-            { id: "finalize", label: "Forge"      },
+            { id: "body",      label: "Chassis"    },
+            { id: "attack",    label: "Weapon"     },
+            { id: "secondary", label: "Secondary"  },
+            { id: "defense",   label: "Defense"    },
+            { id: "finalize",  label: "Forge"      },
           ].map(tab => (
             <button
               key={tab.id}

@@ -13,4 +13,5 @@ export const RobotPartCategory = {
   body: "body",
   attack: "attack",
   defense: "defense",
+  secondary: "secondary",
 } as const;

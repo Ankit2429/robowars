@@ -9,6 +9,7 @@ export const robotsTable = pgTable("robots", {
   bodyPartId: text("body_part_id").notNull(),
   attackPartId: text("attack_part_id").notNull(),
   defensePartId: text("defense_part_id").notNull(),
+  secondaryWeaponId: text("secondary_weapon_id"),
   totalStats: jsonb("total_stats").notNull().$type<{ armor: number; power: number; speed: number; energy: number }>(),
   specialAbility: text("special_ability"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

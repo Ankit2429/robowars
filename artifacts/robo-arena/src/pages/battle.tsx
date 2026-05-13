@@ -3,12 +3,14 @@ import { useRoute, useLocation } from "wouter";
 import { WebGLErrorBoundary } from "@/components/WebGLErrorBoundary";
 import { useWebGLSupported } from "@/hooks/useWebGL";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skull, Zap, Trophy } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "@/context/SessionContext";
 import { RageQuitModal } from "@/components/RageQuitModal";
+import { Robot3D } from "@/components/Robot3D";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface StoredRobot {
@@ -203,126 +205,7 @@ function ImpactFlash({ x, y, z, color }: { x: number; y: number; z: number; colo
   );
 }
 
-// ─── 3D: Vehicle weapon ───────────────────────────────────────────────────────
-function VehicleWeapon({ atkColor, attackPartId, isAttacking }: {
-  atkColor: string; attackPartId: string; isAttacking: boolean;
-}) {
-  const lc  = (attackPartId || "").toLowerCase();
-  const isCannon = lc.includes("plasma") || lc.includes("rocket") || lc.includes("cannon");
-  const isSaw    = lc.includes("saw");
-  const glow     = isAttacking ? 3.0 : 0.8;
-
-  if (isCannon) return (
-    <group position={[0, 0.42, 1.62]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.14, 0.2, 1.3, 8]} />
-        <meshStandardMaterial color={atkColor} metalness={0.3} roughness={0.3} emissive={atkColor} emissiveIntensity={glow} />
-      </mesh>
-      <mesh position={[0, 0.64, 0]}>
-        <sphereGeometry args={[0.22, 8, 8]} />
-        <meshBasicMaterial color={atkColor} />
-      </mesh>
-    </group>
-  );
-
-  if (isSaw) return (
-    <group position={[0, 0.35, 1.62]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.58, 0.58, 0.18, 12]} />
-        <meshStandardMaterial color={atkColor} metalness={0.2} roughness={0.2} emissive={atkColor} emissiveIntensity={glow} />
-      </mesh>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <mesh key={i}
-          position={[Math.cos(i * Math.PI / 4) * 0.59, 0, Math.sin(i * Math.PI / 4) * 0.59]}
-          rotation={[0, i * Math.PI / 4, 0]}>
-          <boxGeometry args={[0.18, 0.14, 0.16]} />
-          <meshStandardMaterial color={atkColor} emissive={atkColor} emissiveIntensity={glow * 1.1} />
-        </mesh>
-      ))}
-    </group>
-  );
-
-  return (
-    <group position={[0, 0.3, 1.5]}>
-      <mesh position={[0, 0.06, -0.1]}>
-        <boxGeometry args={[1.1, 0.22, 0.28]} />
-        <meshStandardMaterial color={atkColor} metalness={0.4} roughness={0.35} emissive={atkColor} emissiveIntensity={glow * 0.65} />
-      </mesh>
-      {([-0.5, -0.16, 0.16, 0.5] as const).map((x, j) => (
-        <mesh key={j} position={[x, 0, j % 2 === 0 ? 0.33 : 0.48]}>
-          <boxGeometry args={[0.15, 0.22, 0.85]} />
-          <meshStandardMaterial color={atkColor} metalness={0.35} roughness={0.3} emissive={atkColor} emissiveIntensity={glow * 0.9} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-// ─── 3D: Robot body ───────────────────────────────────────────────────────────
-function RobotBody({ bodyColor, atkColor, defColor, attackPartId, isHit, isAttacking }: {
-  bodyColor: string; atkColor: string; defColor: string;
-  attackPartId: string; isHit: boolean; isAttacking: boolean;
-}) {
-  const bc = isHit ? "#ffffff" : bodyColor;
-  const bi = isHit ? 4.0 : 0.4;
-  return (
-    <group>
-      <mesh position={[0, 0.3, 0]}>
-        <boxGeometry args={[1.9, 0.5, 2.8]} />
-        <meshStandardMaterial color={bc} metalness={0.5} roughness={0.35} emissive={bc} emissiveIntensity={bi} />
-      </mesh>
-      <mesh position={[0, 0.47, 1.42]} rotation={[0.45, 0, 0]}>
-        <boxGeometry args={[1.65, 0.5, 0.2]} />
-        <meshStandardMaterial color={bc} metalness={0.55} roughness={0.3} emissive={bc} emissiveIntensity={bi * 1.1} />
-      </mesh>
-      {([-1.02, 1.02] as const).map((x, i) => (
-        <group key={i}>
-          <mesh position={[x, 0.42, 0]}>
-            <boxGeometry args={[0.16, 0.64, 2.5]} />
-            <meshStandardMaterial color={defColor} metalness={0.4} roughness={0.38} emissive={defColor} emissiveIntensity={0.5} />
-          </mesh>
-        </group>
-      ))}
-      <mesh position={[0, 0.71, -0.32]}>
-        <boxGeometry args={[1.0, 0.42, 1.28]} />
-        <meshStandardMaterial color={bc} metalness={0.5} roughness={0.35} emissive={bc} emissiveIntensity={bi * 1.3} />
-      </mesh>
-      <mesh position={[0, 0.95, -0.32]}>
-        <cylinderGeometry args={[0.22, 0.22, 0.1, 8]} />
-        <meshStandardMaterial color={bc} metalness={0.7} roughness={0.3} emissive={bc} emissiveIntensity={bi * 1.5} />
-      </mesh>
-      {([-0.55, 0.55] as const).map((x, i) => (
-        <mesh key={i} position={[x, 0.35, 1.41]}>
-          <boxGeometry args={[0.2, 0.1, 0.05]} />
-          <meshBasicMaterial color={isHit ? "#ff4444" : atkColor} />
-        </mesh>
-      ))}
-      {([[-0.96, 0.25, 0.97], [0.96, 0.25, 0.97], [-0.96, 0.25, -0.97], [0.96, 0.25, -0.97]] as const).map(([x, y, z], i) => (
-        <group key={i}>
-          <mesh position={[x, y, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.32, 0.32, 0.28, 8]} />
-            <meshStandardMaterial color="#0d0d0d" metalness={0.85} roughness={0.4} />
-          </mesh>
-          <mesh position={[x + (x > 0 ? 0.16 : -0.16), y, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.14, 0.14, 0.06, 6]} />
-            <meshStandardMaterial color={defColor} metalness={0.7} emissive={defColor} emissiveIntensity={0.5} />
-          </mesh>
-        </group>
-      ))}
-      <mesh position={[0, 0.4, -1.48]}>
-        <boxGeometry args={[1.7, 0.58, 0.16]} />
-        <meshStandardMaterial color={defColor} metalness={0.45} roughness={0.35} emissive={defColor} emissiveIntensity={0.45} />
-      </mesh>
-      {([-0.47, 0.47] as const).map((x, i) => (
-        <mesh key={i} position={[x, 0.52, -1.5]}>
-          <cylinderGeometry args={[0.085, 0.065, 0.38, 6]} />
-          <meshStandardMaterial color="#111" emissive={atkColor} emissiveIntensity={0.65} />
-        </mesh>
-      ))}
-      <VehicleWeapon atkColor={atkColor} attackPartId={attackPartId} isAttacking={isAttacking} />
-    </group>
-  );
-}
+// Removed duplicate RobotBody and VehicleWeapon
 
 // ─── 3D: Arena robot ─────────────────────────────────────────────────────────
 function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, lungeDirRef }: {
@@ -370,7 +253,7 @@ function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, 
         <ringGeometry args={[1.1, 1.6, 20]} />
         <meshBasicMaterial color={config.bodyColor} transparent opacity={isHit ? 0.7 : 0.25} />
       </mesh>
-      <RobotBody
+      <Robot3D
         bodyColor={config.bodyColor} atkColor={config.attackColor} defColor={config.defenseColor}
         attackPartId={config.attackPartId || "attack-crusher"}
         isHit={isHit} isAttacking={isAttacking}

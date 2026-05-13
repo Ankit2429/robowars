@@ -98,17 +98,38 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Starting budget info */}
-        <div className="brutal-border bg-primary/5 border-primary/40 p-4 mb-6 flex items-center gap-3">
-          <Zap className="h-5 w-5 text-primary shrink-0" />
-          <div>
-            <p className="font-display text-primary font-bold text-sm uppercase tracking-widest">
-              Starting Budget: {STARTING_POINTS.toLocaleString()} pts
-            </p>
-            <p className="font-mono text-xs text-muted-foreground mt-0.5">
-              Spend points to build your robot. Win battles to earn more.
-            </p>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/20 via-[#11111a] to-background border border-primary/30 p-5 mb-8 shadow-2xl shadow-primary/10 backdrop-blur-md group"
+        >
+          <div className="absolute -top-6 -right-6 p-4 opacity-10 group-hover:opacity-20 group-hover:rotate-12 transition-all duration-500">
+            <Zap className="w-32 h-32 text-primary" />
           </div>
-        </div>
+          <div className="relative z-10 flex items-start gap-4">
+            <div className="p-3 bg-primary/20 rounded-md border border-primary/40 shadow-[0_0_15px_rgba(255,69,0,0.3)] group-hover:shadow-[0_0_25px_rgba(255,69,0,0.5)] transition-shadow duration-300">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-display text-primary font-black text-lg uppercase tracking-widest drop-shadow-md">
+                Starting Grant: <span className="text-white">{STARTING_POINTS.toLocaleString()} PTS</span>
+              </p>
+              <p className="font-mono text-xs text-white/70 mt-1.5 leading-relaxed max-w-[280px]">
+                Initial funds transferred. Spend wisely in the <span className="text-primary font-bold">Forge</span> to construct your Mecha. Emerge victorious to accumulate more credits.
+              </p>
+            </div>
+          </div>
+          {/* Animated progress line */}
+          <div className="absolute bottom-0 left-0 h-[2px] w-full bg-primary/10">
+            <motion.div 
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
+              className="h-full bg-gradient-to-r from-transparent via-primary to-transparent"
+            />
+          </div>
+        </motion.div>
 
         {/* Login form */}
         <motion.form

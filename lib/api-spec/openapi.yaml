@@ -166,7 +166,7 @@ components:
           type: string
         category:
           type: string
-          enum: [body, attack, defense]
+          enum: [body, attack, defense, secondary]
         stats:
           $ref: "#/components/schemas/PartStats"
         color:
@@ -205,6 +205,8 @@ components:
           type: string
         defensePartId:
           type: string
+        secondaryWeaponId:
+          type: ["string", "null"]
         totalStats:
           $ref: "#/components/schemas/PartStats"
         specialAbility:
@@ -228,6 +230,8 @@ components:
           type: string
         defensePartId:
           type: string
+        secondaryWeaponId:
+          type: ["string", "null"]
 
     Room:
       type: object

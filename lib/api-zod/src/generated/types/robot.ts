@@ -14,6 +14,8 @@ export interface Robot {
   bodyPartId: string;
   attackPartId: string;
   defensePartId: string;
+  /** @nullable */
+  secondaryWeaponId?: string | null;
   totalStats: PartStats;
   /** @nullable */
   specialAbility?: string | null;

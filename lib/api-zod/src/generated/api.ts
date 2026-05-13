@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
 export const ListPartsResponseItem = zod.object({
   id: zod.string(),
   name: zod.string(),
-  category: zod.enum(["body", "attack", "defense"]),
+  category: zod.enum(["body", "attack", "defense", "secondary"]),
   stats: zod.object({
     armor: zod.number(),
     power: zod.number(),
@@ -43,6 +43,7 @@ export const ListRobotsResponseItem = zod.object({
   bodyPartId: zod.string(),
   attackPartId: zod.string(),
   defensePartId: zod.string(),
+  secondaryWeaponId: zod.string().nullish(),
   totalStats: zod.object({
     armor: zod.number(),
     power: zod.number(),
@@ -64,6 +65,7 @@ export const CreateRobotBody = zod.object({
   bodyPartId: zod.string(),
   attackPartId: zod.string(),
   defensePartId: zod.string(),
+  secondaryWeaponId: zod.string().nullish(),
 });
 
 /**
@@ -80,6 +82,7 @@ export const GetRobotResponse = zod.object({
   bodyPartId: zod.string(),
   attackPartId: zod.string(),
   defensePartId: zod.string(),
+  secondaryWeaponId: zod.string().nullish(),
   totalStats: zod.object({
     armor: zod.number(),
     power: zod.number(),

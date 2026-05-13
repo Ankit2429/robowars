@@ -48,15 +48,17 @@ const ROBOT_PARTS: Record<string, { armor: number; power: number; speed: number;
   "defense-iron-fortress":       { armor: 100, power: 40, speed: 15, energy: 25, specialAbility: "Impenetrable" },
 };
 
-function computeStats(bodyId: string, attackId: string, defenseId: string) {
+function computeStats(bodyId: string, attackId: string, defenseId: string, secondaryId?: string | null) {
   const b = ROBOT_PARTS[bodyId]    ?? { armor: 50, power: 50, speed: 50, energy: 50 };
   const a = ROBOT_PARTS[attackId]  ?? { armor: 50, power: 50, speed: 50, energy: 50 };
   const d = ROBOT_PARTS[defenseId] ?? { armor: 50, power: 50, speed: 50, energy: 50 };
+  const s = secondaryId ? ROBOT_PARTS[secondaryId] : { armor: 0, power: 0, speed: 0, energy: 0 };
+  
   return {
-    armor:  Math.min(100, Math.round((b.armor  + a.armor  + d.armor)  / 3)),
-    power:  Math.min(100, Math.round((b.power  + a.power  + d.power)  / 3)),
-    speed:  Math.min(100, Math.round((b.speed  + a.speed  + d.speed)  / 3)),
-    energy: Math.min(100, Math.round((b.energy + a.energy + d.energy) / 3)),
+    armor:  Math.min(100, Math.round((b.armor  + a.armor  + d.armor + (s?.armor ?? 0))  / 3)),
+    power:  Math.min(100, Math.round((b.power  + a.power  + d.power + (s?.power ?? 0))  / 3)),
+    speed:  Math.min(100, Math.round((b.speed  + a.speed  + d.speed + (s?.speed ?? 0))  / 3)),
+    energy: Math.min(100, Math.round((b.energy + a.energy + d.energy + (s?.energy ?? 0)) / 3)),
   };
 }
 
@@ -77,8 +79,8 @@ router.post("/robots", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, playerName, bodyPartId, attackPartId, defensePartId } = parsed.data;
-  const totalStats = computeStats(bodyPartId, attackPartId, defensePartId);
+  const { name, playerName, bodyPartId, attackPartId, defensePartId, secondaryWeaponId } = parsed.data;
+  const totalStats = computeStats(bodyPartId, attackPartId, defensePartId, secondaryWeaponId);
   const attackPart = ROBOT_PARTS[attackPartId];
   const specialAbility = attackPart?.specialAbility ?? null;
 
@@ -89,6 +91,7 @@ router.post("/robots", async (req, res): Promise<void> => {
       bodyPartId,
       attackPartId,
       defensePartId,
+      secondaryWeaponId,
       totalStats,
       specialAbility,
     }).returning();

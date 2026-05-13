@@ -1,17 +1,15 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { drizzle } from "drizzle-orm/pglite";
+import { PGlite } from "@electric-sql/pglite";
 import * as schema from "./schema";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const { Pool } = pg;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dbPath = path.resolve(__dirname, "../../../database-pglite");
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Create a PostgreSQL database and set the DATABASE_URL environment variable.\n" +
-    "Example: DATABASE_URL=postgres://user:password@localhost:5432/robo_arena",
-  );
-}
-
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+// Initialize PGlite with persistent storage on disk
+export const client = new PGlite(dbPath);
+export const db = drizzle(client, { schema });
 
 export * from "./schema";
