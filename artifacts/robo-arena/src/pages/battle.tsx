@@ -334,7 +334,6 @@ function ProcArena() {
 }
 
 
-      {[-4,-2,0,2,4].map(z=><mesh key={`pz-${z}`} rotation={[-Math.PI/2,0,0]} position={[0,0.005,z]}><planeGeometry args={[W+2,0.04]}/><meshBasicMaterial color="#222"/></mesh>)}
       {/* Scratch marks */}
       {[[-4,2,0.6],[3,-1,1.2],[-1,-3,0.3],[5,1,2.1]].map(([x,z,r],i)=><mesh key={`sc-${i}`} rotation={[-Math.PI/2,0,r]} position={[x,0.008,z]}><planeGeometry args={[0.03,2.2]}/><meshBasicMaterial color="#111"/></mesh>)}
       {/* Scorch marks */}
