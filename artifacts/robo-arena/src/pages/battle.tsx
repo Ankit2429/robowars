@@ -5,12 +5,13 @@ import { useWebGLSupported } from "@/hooks/useWebGL";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skull, Zap, Trophy } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "@/context/SessionContext";
 import { RageQuitModal } from "@/components/RageQuitModal";
-import { Robot3D } from "@/components/Robot3D";
+import { HighFidelityRobotMesh } from "@/components/RobotParts3D";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface StoredRobot {
@@ -40,8 +41,8 @@ const DEFAULT_AI: StoredRobot = {
 };
 
 // ─── Arena constants ──────────────────────────────────────────────────────────
-const ARENA_X = 9.0;
-const ARENA_Z = 7.0;
+const ARENA_X = 16.0;  // was 9.0 — 1.8× scale
+const ARENA_Z = 12.5;  // was 7.0 — 1.8× scale
 
 // ─── 3D: Spinning saw blade ───────────────────────────────────────────────────
 function SpinningSaw({ pos, color }: { pos: [number, number, number]; color: string }) {
@@ -69,130 +70,362 @@ function SpinningSaw({ pos, color }: { pos: [number, number, number]; color: str
   );
 }
 
-// ─── 3D: Procedural Battle Arena ─────────────────────────────────────────────
+// ─── Hazard: Screw drums (north wall) ────────────────────────────────────────
+function HazardScrews() {
+  const refs = [useRef<THREE.Group>(null!), useRef<THREE.Group>(null!), useRef<THREE.Group>(null!), useRef<THREE.Group>(null!), useRef<THREE.Group>(null!)];
+  useFrame((_,dt) => refs.forEach(r => { if(r.current) r.current.rotation.z += dt*3; }));
+  return <group>{([-7,-3.5,0,3.5,7] as number[]).map((x,i) => (
+    <group key={i} position={[x, 0.55, -ARENA_Z-0.1]}>
+      <group ref={refs[i]}>
+        <mesh castShadow><cylinderGeometry args={[0.55,0.55,1.1,20]}/><meshStandardMaterial color="#333" metalness={0.9} roughness={0.3}/></mesh>
+        {[0,1,2].map(j=><mesh key={j} position={[0,0,0]} rotation={[j*Math.PI/3,0,0]}><boxGeometry args={[1.12,0.12,0.12]}/><meshStandardMaterial color="#555" metalness={0.85} roughness={0.2}/></mesh>)}
+      </group>
+      <mesh position={[0,0.75,0]}><boxGeometry args={[1.2,0.3,0.6]}/><meshStandardMaterial color="#222" metalness={0.8} roughness={0.4}/></mesh>
+      {[0,1].map(j=><mesh key={j} position={[(j-.5)*0.6,0.9,0.05]}><boxGeometry args={[0.18,0.14,0.02]}/><meshBasicMaterial color={j%2?"#111":"#ffcc00"}/></mesh>)}
+    </group>
+  ))}</group>;
+}
+
+// ─── Hazard: Floor spikes (center strip) ─────────────────────────────────────
+function HazardSpikes() {
+  const t = useRef(0);
+  const refs = Array.from({length:6},()=>useRef<THREE.Group>(null!));
+  useFrame((_,dt) => {
+    t.current += dt;
+    const cycle = t.current % 7;
+    const up = cycle > 4 && cycle < 7;
+    const h = up ? Math.min((cycle-4)/0.3,1)*1.5 : 0;
+    refs.forEach(r => { if(r.current) r.current.position.y = h; });
+  });
+  return <group>{([-5,-3,-1,1,3,5] as number[]).map((x,i)=>(
+    <group key={i} position={[x,0,0]}>
+      <group ref={refs[i]}>
+        <mesh castShadow><cylinderGeometry args={[0,0.18,1.5,6]}/><meshStandardMaterial color="#2a2a2a" metalness={0.92} roughness={0.15}/></mesh>
+      </group>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.01,0]}><circleGeometry args={[0.28,6]}/><meshBasicMaterial color="#ffcc00" transparent opacity={0.5}/></mesh>
+    </group>
+  ))}</group>;
+}
+
+// ─── Hazard: Rotating hammer (west wall) ─────────────────────────────────────
+function HazardHammer() {
+  const arm = useRef<THREE.Group>(null!);
+  const t = useRef(0);
+  useFrame((_,dt) => {
+    t.current += dt;
+    const cycle = t.current % 6;
+    const angle = cycle < 1 ? (cycle/0.8)*-Math.PI/2 : Math.max(-Math.PI/2, (-Math.PI/2)*(1-(cycle-1)/1.5));
+    if(arm.current) arm.current.rotation.z = angle;
+  });
+  return <group position={[-ARENA_X-0.2,1.2,0]}>
+    <mesh><cylinderGeometry args={[0.28,0.28,0.5,12]}/><meshStandardMaterial color="#222" metalness={0.9} roughness={0.2}/></mesh>
+    <group ref={arm}>
+      <mesh position={[0.9,0,0]}><boxGeometry args={[1.8,0.18,0.18]}/><meshStandardMaterial color="#2a2a2a" metalness={0.88} roughness={0.25}/></mesh>
+      <mesh position={[1.85,0,0]} castShadow><boxGeometry args={[0.42,0.55,0.42]}/><meshStandardMaterial color="#333" metalness={0.9} roughness={0.18}/></mesh>
+      {[-0.12,0,0.12].map((z,i)=><mesh key={i} position={[1.85,0,z]}><boxGeometry args={[0.44,0.06,0.04]}/><meshBasicMaterial color={i%2?"#111":"#ffcc00"}/></mesh>)}
+    </group>
+  </group>;
+}
+
+// ─── Hazard: Pneumatic ram (east wall) ────────────────────────────────────────
+function HazardRam() {
+  const ram = useRef<THREE.Group>(null!);
+  const t = useRef(0);
+  useFrame((_,dt) => {
+    t.current += dt;
+    const cycle = t.current % 8;
+    const ext = cycle < 0.2 ? (cycle/0.2)*-3 : cycle < 1.7 ? THREE.MathUtils.lerp(-3,0,(cycle-0.2)/1.5) : 0;
+    if(ram.current) ram.current.position.x = ext;
+  });
+  return <group position={[ARENA_X+0.3,1.0,0]}>
+    <mesh><boxGeometry args={[0.5,0.8,0.8]}/><meshStandardMaterial color="#222" metalness={0.9} roughness={0.2}/></mesh>
+    {[-0.15,0,0.15].map((z,i)=><mesh key={i} position={[0,0.42,z]}><boxGeometry args={[0.52,0.06,0.04]}/><meshBasicMaterial color={i%2?"#111":"#ffcc00"}/></mesh>)}
+    <group ref={ram}>
+      <mesh position={[-0.8,0,0]}><cylinderGeometry args={[0.3,0.3,1.6,14]} /><meshStandardMaterial color="#444" metalness={0.88} roughness={0.22}/></mesh>
+      <mesh position={[-1.62,0,0]}><cylinderGeometry args={[0.36,0.36,0.14,14]}/><meshStandardMaterial color="#888" metalness={0.95} roughness={0.08}/></mesh>
+    </group>
+  </group>;
+}
+
+// ─── Hazard: Wrecking ball ────────────────────────────────────────────────────
+function HazardWreckingBall() {
+  const ball = useRef<THREE.Group>(null!);
+  const t = useRef(0);
+  useFrame((_,dt) => {
+    t.current += dt;
+    if(ball.current) ball.current.rotation.z = Math.sin(t.current*0.8)*0.7;
+  });
+  return <group position={[0,7.5,0]} ref={ball}>
+    <mesh position={[0,-3.2,0]} castShadow>
+      <sphereGeometry args={[0.65,16,16]}/>
+      <meshStandardMaterial color="#555" metalness={0.78} roughness={0.42}/>
+    </mesh>
+    {Array.from({length:8}).map((_,i)=>{
+      const a=i*Math.PI/4;
+      return <mesh key={i} position={[Math.cos(a)*0.65,Math.sin(a)*0.65-3.2,0]} castShadow>
+        <sphereGeometry args={[0.07,8,8]}/>
+        <meshStandardMaterial color="#888" metalness={0.9} roughness={0.1}/>
+      </mesh>;
+    })}
+    {Array.from({length:6}).map((_,i)=><mesh key={i} position={[0,-i*0.42-0.7,0]}><torusGeometry args={[0.14,0.04,8,12]}/><meshStandardMaterial color="#666" metalness={0.85} roughness={0.25}/></mesh>)}
+  </group>;
+}
+
+// ─── 3D: Minimal Industrial Battle Arena ─────────────────────────────────────
 function ProcArena() {
+  const W = ARENA_X * 2 + 2, D = ARENA_Z * 2 + 2;
+  const flameRef = useRef<THREE.Group[]>([]);
+  const flameT = useRef(0);
+  useFrame((_, dt) => {
+    flameT.current += dt;
+    flameRef.current.forEach((g, i) => {
+      if (!g) return;
+      const cycle = (flameT.current + i * 2.5) % 10;
+      const active = cycle > 8;
+      g.visible = active;
+      if (active) g.scale.y = 0.4 + Math.sin(flameT.current * 12 + i) * 0.15;
+    });
+  });
+  // Panel seam positions across the large floor
+  const seamsX = [-12,-8,-4,0,4,8,12];
+  const seamsZ = [-8,-4,0,4,8];
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[ARENA_X * 2 + 4, ARENA_Z * 2 + 4]} />
-        <meshStandardMaterial color="#1c1c1e" metalness={0.85} roughness={0.25} />
+      {/* ── FLOOR: Dark industrial steel ── */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,-0.01,0]} receiveShadow>
+        <planeGeometry args={[W+4, D+4]}/>
+        <meshStandardMaterial color="#181a1c" metalness={0.82} roughness={0.52}/>
       </mesh>
-      <gridHelper args={[ARENA_X * 2 + 2, 22, "#3a0000", "#1a0a0a"]} position={[0, 0.015, 0]} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <ringGeometry args={[2.2, 3.2, 24]} />
-        <meshBasicMaterial color="#FF2200" transparent opacity={0.65} />
+      {/* Panel seams — subtle grid lines */}
+      {seamsX.map(x=><mesh key={`px-${x}`} rotation={[-Math.PI/2,0,0]} position={[x,0.005,0]}>
+        <planeGeometry args={[0.035, D+4]}/><meshBasicMaterial color="#242628"/>
+      </mesh>)}
+      {seamsZ.map(z=><mesh key={`pz-${z}`} rotation={[-Math.PI/2,0,0]} position={[0,0.005,z]}>
+        <planeGeometry args={[W+4, 0.035]}/><meshBasicMaterial color="#242628"/>
+      </mesh>)}
+      {/* Tyre marks — wide dark streaks */}
+      {[[-6,3,0.4],[-2,-5,1.8],[8,2,0.0],[4,-3,2.6],[-9,1,0.9]].map(([x,z,r],i)=>(
+        <mesh key={`tyre-${i}`} rotation={[-Math.PI/2,0,r]} position={[x,0.008,z]}>
+          <planeGeometry args={[0.18, 4.5]}/><meshBasicMaterial color="#101012" transparent opacity={0.7}/>
+        </mesh>
+      ))}
+      {/* Scorch circles — 4 spots */}
+      {[[-10,4],[7,-6],[-5,-8],[11,3]].map(([x,z],i)=>(
+        <mesh key={`burn-${i}`} rotation={[-Math.PI/2,0,0]} position={[x,0.009,z]}>
+          <circleGeometry args={[0.65+i*0.1, 20]}/><meshBasicMaterial color="#0c0c0e" transparent opacity={0.8}/>
+        </mesh>
+      ))}
+      {/* Centre wear plate — lighter brushed area */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.007,0]}>
+        <circleGeometry args={[5, 40]}/><meshBasicMaterial color="#202224" transparent opacity={0.55}/>
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
-        <circleGeometry args={[2.1, 24]} />
-        <meshBasicMaterial color="#FF0000" transparent opacity={0.12} />
+      {/* Warning stripe — centre line (faint) */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.01,0]}>
+        <planeGeometry args={[W+2, 0.08]}/><meshBasicMaterial color="#2a2000" transparent opacity={0.5}/>
       </mesh>
-      <mesh position={[0, 0.03, -ARENA_Z - 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[ARENA_X * 2 + 2, 0.22]} />
-        <meshBasicMaterial color="#FF2200" transparent opacity={0.9} />
+      {/* ── RED START ZONE (north) ── */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.012,-ARENA_Z+2]}>
+        <planeGeometry args={[14, 3.5]}/><meshStandardMaterial color="#8a1000" metalness={0.5} roughness={0.65}/>
       </mesh>
-      <mesh position={[0, 0.03, ARENA_Z + 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[ARENA_X * 2 + 2, 0.22]} />
-        <meshBasicMaterial color="#00DDFF" transparent opacity={0.9} />
+      {/* ── BLUE START ZONE (south) ── */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.012, ARENA_Z-2]}>
+        <planeGeometry args={[14, 3.5]}/><meshStandardMaterial color="#082270" metalness={0.5} roughness={0.65}/>
       </mesh>
-      <mesh position={[-ARENA_X - 0.3, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.22, ARENA_Z * 2 + 2]} />
-        <meshBasicMaterial color="#FF4400" transparent opacity={0.7} />
+      {/* ── WALLS: Steel base ── */}
+      <mesh position={[0,1.8,-ARENA_Z-0.7]} castShadow receiveShadow>
+        <boxGeometry args={[W+3, 3.6, 0.55]}/><meshStandardMaterial color="#0c0c0e" metalness={0.92} roughness={0.18}/>
       </mesh>
-      <mesh position={[ARENA_X + 0.3, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.22, ARENA_Z * 2 + 2]} />
-        <meshBasicMaterial color="#0099FF" transparent opacity={0.7} />
+      <mesh position={[0,1.8, ARENA_Z+0.7]} castShadow receiveShadow>
+        <boxGeometry args={[W+3, 3.6, 0.55]}/><meshStandardMaterial color="#0c0c0e" metalness={0.92} roughness={0.18}/>
       </mesh>
-      {/* Walls */}
-      <mesh position={[0, 1.6, -ARENA_Z - 0.5]}>
-        <boxGeometry args={[ARENA_X * 2 + 3, 3.2, 0.5]} />
-        <meshStandardMaterial color="#0d0d0d" metalness={0.9} roughness={0.2} />
+      <mesh position={[-ARENA_X-0.7,1.8,0]} castShadow receiveShadow>
+        <boxGeometry args={[0.55, 3.6, D+3]}/><meshStandardMaterial color="#0c0c0e" metalness={0.92} roughness={0.18}/>
       </mesh>
-      <mesh position={[0, 3.2, -ARENA_Z - 0.5]}>
-        <boxGeometry args={[ARENA_X * 2 + 3, 0.18, 0.6]} />
-        <meshBasicMaterial color="#FF2200" />
+      <mesh position={[ ARENA_X+0.7,1.8,0]} castShadow receiveShadow>
+        <boxGeometry args={[0.55, 3.6, D+3]}/><meshStandardMaterial color="#0c0c0e" metalness={0.92} roughness={0.18}/>
       </mesh>
-      <mesh position={[0, 1.6, ARENA_Z + 0.5]}>
-        <boxGeometry args={[ARENA_X * 2 + 3, 3.2, 0.5]} />
-        <meshStandardMaterial color="#0d0d0d" metalness={0.9} roughness={0.2} />
+      {/* Glass panels — all 4 sides */}
+      <mesh position={[0,1.6,-ARENA_Z-0.42]}>
+        <boxGeometry args={[W+2.5, 2.8, 0.05]}/><meshStandardMaterial color="#2a3844" transparent opacity={0.12} roughness={0.04} metalness={0.1}/>
       </mesh>
-      <mesh position={[0, 3.2, ARENA_Z + 0.5]}>
-        <boxGeometry args={[ARENA_X * 2 + 3, 0.18, 0.6]} />
-        <meshBasicMaterial color="#00AAFF" />
+      <mesh position={[0,1.6, ARENA_Z+0.42]}>
+        <boxGeometry args={[W+2.5, 2.8, 0.05]}/><meshStandardMaterial color="#2a3844" transparent opacity={0.12} roughness={0.04} metalness={0.1}/>
       </mesh>
-      <mesh position={[ARENA_X + 0.5, 1.6, 0]}>
-        <boxGeometry args={[0.5, 3.2, ARENA_Z * 2 + 3]} />
-        <meshStandardMaterial color="#0d0d0d" metalness={0.9} roughness={0.2} />
+      <mesh position={[-ARENA_X-0.42,1.6,0]}>
+        <boxGeometry args={[0.05, 2.8, D+2.5]}/><meshStandardMaterial color="#2a3844" transparent opacity={0.12} roughness={0.04} metalness={0.1}/>
       </mesh>
-      <mesh position={[ARENA_X + 0.5, 3.2, 0]}>
-        <boxGeometry args={[0.6, 0.18, ARENA_Z * 2 + 3]} />
-        <meshBasicMaterial color="#FF4400" />
+      <mesh position={[ ARENA_X+0.42,1.6,0]}>
+        <boxGeometry args={[0.05, 2.8, D+2.5]}/><meshStandardMaterial color="#2a3844" transparent opacity={0.12} roughness={0.04} metalness={0.1}/>
       </mesh>
-      <mesh position={[-ARENA_X - 0.5, 1.6, 0]}>
-        <boxGeometry args={[0.5, 3.2, ARENA_Z * 2 + 3]} />
-        <meshStandardMaterial color="#0d0d0d" metalness={0.9} roughness={0.2} />
-      </mesh>
-      <mesh position={[-ARENA_X - 0.5, 3.2, 0]}>
-        <boxGeometry args={[0.6, 0.18, ARENA_Z * 2 + 3]} />
-        <meshBasicMaterial color="#0066FF" />
-      </mesh>
+      {/* Top rails */}
+      <mesh position={[0,3.6,-ARENA_Z-0.7]}><boxGeometry args={[W+3.5,0.22,0.75]}/><meshStandardMaterial color="#1e2022" metalness={0.9} roughness={0.25}/></mesh>
+      <mesh position={[0,3.6, ARENA_Z+0.7]}><boxGeometry args={[W+3.5,0.22,0.75]}/><meshStandardMaterial color="#1e2022" metalness={0.9} roughness={0.25}/></mesh>
+      <mesh position={[-ARENA_X-0.7,3.6,0]}><boxGeometry args={[0.75,0.22,D+3.5]}/><meshStandardMaterial color="#1e2022" metalness={0.9} roughness={0.25}/></mesh>
+      <mesh position={[ ARENA_X+0.7,3.6,0]}><boxGeometry args={[0.75,0.22,D+3.5]}/><meshStandardMaterial color="#1e2022" metalness={0.9} roughness={0.25}/></mesh>
+      {/* Yellow bumper rails — front/back, 7 segments */}
+      {[-12,-8,-4,0,4,8,12].map((x,i)=>[
+        <mesh key={`yf-${i}`} position={[x,0.5,-ARENA_Z-0.35]}><boxGeometry args={[3.2,0.42,0.3]}/><meshStandardMaterial color="#d4a800" metalness={0.6} roughness={0.42}/></mesh>,
+        <mesh key={`yb-${i}`} position={[x,0.5, ARENA_Z+0.35]}><boxGeometry args={[3.2,0.42,0.3]}/><meshStandardMaterial color="#d4a800" metalness={0.6} roughness={0.42}/></mesh>
+      ])}
+      {/* Yellow bumper rails — sides, 5 segments */}
+      {[-8,-4,0,4,8].map((z,i)=>[
+        <mesh key={`yl-${i}`} position={[-ARENA_X-0.35,0.5,z]}><boxGeometry args={[0.3,0.42,4.5]}/><meshStandardMaterial color="#d4a800" metalness={0.6} roughness={0.42}/></mesh>,
+        <mesh key={`yr-${i}`} position={[ ARENA_X+0.35,0.5,z]}><boxGeometry args={[0.3,0.42,4.5]}/><meshStandardMaterial color="#d4a800" metalness={0.6} roughness={0.42}/></mesh>
+      ])}
       {/* Corner pillars */}
-      {([ [-ARENA_X + 0.5, -ARENA_Z + 0.5], [ARENA_X - 0.5, -ARENA_Z + 0.5],
-          [-ARENA_X + 0.5,  ARENA_Z - 0.5], [ARENA_X - 0.5,  ARENA_Z - 0.5] ] as [number,number][]).map(([x, z], i) => (
-        <group key={i} position={[x, 0, z]}>
-          <mesh position={[0, 2, 0]}>
-            <boxGeometry args={[1.2, 4, 1.2]} />
-            <meshStandardMaterial color="#0a0a0a" metalness={0.95} roughness={0.15} />
-          </mesh>
-          <mesh position={[0, 4.15, 0]}>
-            <boxGeometry args={[1.4, 0.22, 1.4]} />
-            <meshBasicMaterial color={i < 2 ? "#FF2200" : "#00AAFF"} />
-          </mesh>
-          <mesh position={[0, 3.3, 0]}>
-            <cylinderGeometry args={[0.14, 0.14, 0.8, 6]} />
-            <meshBasicMaterial color={i < 2 ? "#FF4400" : "#0099FF"} />
-          </mesh>
+      {([[-ARENA_X-0.6,-ARENA_Z-0.6],[ARENA_X+0.6,-ARENA_Z-0.6],[-ARENA_X-0.6,ARENA_Z+0.6],[ARENA_X+0.6,ARENA_Z+0.6]] as [number,number][]).map(([x,z],i)=>(
+        <group key={`cp-${i}`} position={[x,0,z]}>
+          <mesh position={[0,2,0]} castShadow><boxGeometry args={[1.2,4.2,1.2]}/><meshStandardMaterial color="#0a0a0c" metalness={0.95} roughness={0.15}/></mesh>
+          <mesh position={[0,4.25,0]}><boxGeometry args={[1.35,0.18,1.35]}/><meshBasicMaterial color={i<2?"#cc1100":"#0044cc"}/></mesh>
+          <pointLight position={[0,3.8,0]} color={i<2?"#ff2200":"#0055ff"} intensity={1.5} distance={8}/>
         </group>
       ))}
-      <SpinningSaw pos={[-ARENA_X + 2, 0.1, -ARENA_Z + 2]} color="#FF3300" />
-      <SpinningSaw pos={[ ARENA_X - 2, 0.1, -ARENA_Z + 2]} color="#FF3300" />
-      <SpinningSaw pos={[-ARENA_X + 2, 0.1,  ARENA_Z - 2]} color="#00CCFF" />
-      <SpinningSaw pos={[ ARENA_X - 2, 0.1,  ARENA_Z - 2]} color="#00CCFF" />
-      {[-3, 0, 3].map((z, i) => (
-        <mesh key={i} position={[-ARENA_X - 0.4, 1.5, z]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.12, 0.12, 2.2, 6]} />
-          <meshStandardMaterial color="#222" metalness={0.9} roughness={0.3} />
-        </mesh>
-      ))}
-      {[-3, 0, 3].map((z, i) => (
-        <mesh key={i} position={[ARENA_X + 0.4, 1.5, z]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.12, 0.12, 2.2, 6]} />
-          <meshStandardMaterial color="#222" metalness={0.9} roughness={0.3} />
-        </mesh>
-      ))}
-      {([-5, -2.5, 2.5, 5] as number[]).map((x, i) => (
-        <mesh key={i} position={[x, 0.016, ARENA_Z - 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.5, 2.5]} />
-          <meshBasicMaterial color={i % 2 === 0 ? "#FF4400" : "#FFAA00"} transparent opacity={0.55} />
-        </mesh>
-      ))}
-      {([-5, -2.5, 2.5, 5] as number[]).map((x, i) => (
-        <mesh key={i} position={[x, 0.016, -ARENA_Z + 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.5, 2.5]} />
-          <meshBasicMaterial color={i % 2 === 0 ? "#FF4400" : "#FFAA00"} transparent opacity={0.55} />
-        </mesh>
-      ))}
-      {([-5, 0, 5] as number[]).map((x, i) => (
-        <group key={i} position={[x, 5.5, 0]}>
-          <mesh>
-            <boxGeometry args={[0.5, 0.15, 0.5]} />
-            <meshBasicMaterial color="#ffffff" />
-          </mesh>
+      {/* ── INDUSTRIAL LIGHTING RIG ── */}
+      {/* Cross beams */}
+      <mesh position={[0,8.5,0]}><boxGeometry args={[W+6,0.2,0.2]}/><meshStandardMaterial color="#0e0e10" metalness={0.9} roughness={0.2}/></mesh>
+      <mesh position={[0,8.5,0]}><boxGeometry args={[0.2,0.2,D+6]}/><meshStandardMaterial color="#0e0e10" metalness={0.9} roughness={0.2}/></mesh>
+      <mesh position={[-ARENA_X*0.5,8.5,0]}><boxGeometry args={[0.2,0.2,D+6]}/><meshStandardMaterial color="#0e0e10" metalness={0.9} roughness={0.2}/></mesh>
+      <mesh position={[ ARENA_X*0.5,8.5,0]}><boxGeometry args={[0.2,0.2,D+6]}/><meshStandardMaterial color="#0e0e10" metalness={0.9} roughness={0.2}/></mesh>
+      {/* Spotlight housings — 6 positions */}
+      {([[-10,8],[-10,-8],[0,10],[0,-10],[10,8],[10,-8]] as [number,number][]).map(([x,z],i)=>(
+        <group key={`spot-${i}`} position={[x,8.2,z]}>
+          <mesh><cylinderGeometry args={[0.25,0.32,0.45,12]}/><meshStandardMaterial color="#0e0e10" metalness={0.9} roughness={0.2}/></mesh>
+          <mesh position={[0,-0.28,0]}><cylinderGeometry args={[0.1,0.24,0.18,12]}/><meshBasicMaterial color="#e8f0ff"/></mesh>
+          <pointLight position={[0,-0.5,0]} color="#ddeeff" intensity={12} distance={30} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024}/>
         </group>
       ))}
-      <fog attach="fog" args={["#080510", 22, 55]} />
+      {/* Centre overhead fill */}
+      <pointLight position={[0,9,0]} color="#ffffff" intensity={5} distance={40}/>
+      {/* Zone-tint lights */}
+      <pointLight position={[0,5,-ARENA_Z+3]} color="#ff2200" intensity={4} distance={14}/>
+      <pointLight position={[0,5, ARENA_Z-3]} color="#2255ff" intensity={4} distance={14}/>
+      {/* ── HAZARD 1: OVERHEAD CRUSHER (west side) ── */}
+      <HazardHammer/>
+      {/* ── HAZARD 2: PNEUMATIC RAM (east wall) ── */}
+      <HazardRam/>
+      {/* ── HAZARD 3: FLAME VENTS (4 corners only) ── */}
+      {([[-ARENA_X+3,-ARENA_Z+3],[ARENA_X-3,-ARENA_Z+3],[-ARENA_X+3,ARENA_Z-3],[ARENA_X-3,ARENA_Z-3]] as [number,number][]).map(([x,z],i)=>(
+        <group key={`vent-${i}`} position={[x,0,z]}>
+          {/* Grate */}
+          <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.01,0]}>
+            <planeGeometry args={[1.8,1.8]}/><meshStandardMaterial color="#151518" metalness={0.88} roughness={0.35}/>
+          </mesh>
+          {/* Vent slits */}
+          {[-0.5,-0.25,0,0.25,0.5].map((s,j)=>(
+            <mesh key={j} rotation={[-Math.PI/2,0,0]} position={[s,0.015,0]}>
+              <planeGeometry args={[0.06,1.75]}/><meshBasicMaterial color="#050506"/>
+            </mesh>
+          ))}
+          {/* Scorch ring around vent */}
+          <mesh rotation={[-Math.PI/2,0,0]} position={[0,-0.002,0]}>
+            <ringGeometry args={[0.92,1.4,24]}/><meshBasicMaterial color="#0a0808" transparent opacity={0.7}/>
+          </mesh>
+          {/* Flame column — hidden by default, shown on cycle */}
+          <group ref={el=>{ if(el) flameRef.current[i]=el; }} visible={false} position={[0,0.1,0]}>
+            <mesh><cylinderGeometry args={[0.15,0.35,2.0,10]}/><meshBasicMaterial color="#ff5500" transparent opacity={0.7}/></mesh>
+            <mesh position={[0,1.2,0]}><sphereGeometry args={[0.3,10,8]}/><meshBasicMaterial color="#ff8800" transparent opacity={0.5}/></mesh>
+            <pointLight color="#ff6600" intensity={8} distance={5}/>
+          </group>
+        </group>
+      ))}
+      <fog attach="fog" args={["#08080a", 30, 75]}/>
     </group>
   );
 }
+
+
+      {[-4,-2,0,2,4].map(z=><mesh key={`pz-${z}`} rotation={[-Math.PI/2,0,0]} position={[0,0.005,z]}><planeGeometry args={[W+2,0.04]}/><meshBasicMaterial color="#222"/></mesh>)}
+      {/* Scratch marks */}
+      {[[-4,2,0.6],[3,-1,1.2],[-1,-3,0.3],[5,1,2.1]].map(([x,z,r],i)=><mesh key={`sc-${i}`} rotation={[-Math.PI/2,0,r]} position={[x,0.008,z]}><planeGeometry args={[0.03,2.2]}/><meshBasicMaterial color="#111"/></mesh>)}
+      {/* Scorch marks */}
+      {[[-6,3],[-4,-4],[5,-2],[2,5],[-7,-1],[6,2]].map(([x,z],i)=><mesh key={`sc2-${i}`} rotation={[-Math.PI/2,0,0]} position={[x,0.009,z]}><circleGeometry args={[0.5+i*0.1,18]}/><meshBasicMaterial color="#0a0a0a" transparent opacity={0.85}/></mesh>)}
+      {/* Center wear plate (lighter) */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.007,0]}><circleGeometry args={[3.5,32]}/><meshBasicMaterial color="#242424" transparent opacity={0.6}/></mesh>
+      {/* ── START ZONES ── */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.012,-ARENA_Z+1.2]}><planeGeometry args={[8,2.4]}/><meshStandardMaterial color="#bb1a00" metalness={0.55} roughness={0.7}/></mesh>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.013,-ARENA_Z+1.2]}><planeGeometry args={[7.6,2.0]}/><meshBasicMaterial color="#880000" transparent opacity={0.4}/></mesh>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.012, ARENA_Z-1.2]}><planeGeometry args={[8,2.4]}/><meshStandardMaterial color="#0d44aa" metalness={0.55} roughness={0.7}/></mesh>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.013, ARENA_Z-1.2]}><planeGeometry args={[7.6,2.0]}/><meshBasicMaterial color="#0033aa" transparent opacity={0.4}/></mesh>
+      {/* Center shockwave plate */}
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.012,0]}><planeGeometry args={[3,3]}/><meshStandardMaterial color="#1e1e1e" metalness={0.88} roughness={0.3}/></mesh>
+      <mesh ref={warningRef} rotation={[-Math.PI/2,0,0]} position={[0,0.015,0]}><ringGeometry args={[1.4,1.55,32]}/><meshBasicMaterial color="#ffcc00" transparent opacity={0.35}/></mesh>
+      {/* ── WALLS — black steel base ── */}
+      <mesh position={[0,1.8,-ARENA_Z-0.6]} castShadow><boxGeometry args={[W+2.5,3.6,0.55]}/><meshStandardMaterial color="#0d0d0d" metalness={0.92} roughness={0.18}/></mesh>
+      <mesh position={[0,1.8, ARENA_Z+0.6]} castShadow><boxGeometry args={[W+2.5,3.6,0.55]}/><meshStandardMaterial color="#0d0d0d" metalness={0.92} roughness={0.18}/></mesh>
+      <mesh position={[-ARENA_X-0.6,1.8,0]} castShadow><boxGeometry args={[0.55,3.6,D+2.5]}/><meshStandardMaterial color="#0d0d0d" metalness={0.92} roughness={0.18}/></mesh>
+      <mesh position={[ ARENA_X+0.6,1.8,0]} castShadow><boxGeometry args={[0.55,3.6,D+2.5]}/><meshStandardMaterial color="#0d0d0d" metalness={0.92} roughness={0.18}/></mesh>
+      {/* Glass panels */}
+      <mesh position={[0,1.6,-ARENA_Z-0.32]}><boxGeometry args={[W+1.8,2.8,0.06]}/><meshStandardMaterial color="#334455" metalness={0.1} roughness={0.05} transparent opacity={0.15}/></mesh>
+      <mesh position={[0,1.6, ARENA_Z+0.32]}><boxGeometry args={[W+1.8,2.8,0.06]}/><meshStandardMaterial color="#334455" metalness={0.1} roughness={0.05} transparent opacity={0.15}/></mesh>
+      <mesh position={[-ARENA_X-0.32,1.6,0]}><boxGeometry args={[0.06,2.8,D+1.8]}/><meshStandardMaterial color="#334455" metalness={0.1} roughness={0.05} transparent opacity={0.15}/></mesh>
+      <mesh position={[ ARENA_X+0.32,1.6,0]}><boxGeometry args={[0.06,2.8,D+1.8]}/><meshStandardMaterial color="#334455" metalness={0.1} roughness={0.05} transparent opacity={0.15}/></mesh>
+      {/* Top rail - dark grey with rivets */}
+      <mesh position={[0,3.55,-ARENA_Z-0.6]}><boxGeometry args={[W+2.7,0.22,0.7]}/><meshStandardMaterial color="#222" metalness={0.88} roughness={0.28}/></mesh>
+      <mesh position={[0,3.55, ARENA_Z+0.6]}><boxGeometry args={[W+2.7,0.22,0.7]}/><meshStandardMaterial color="#222" metalness={0.88} roughness={0.28}/></mesh>
+      <mesh position={[-ARENA_X-0.6,3.55,0]}><boxGeometry args={[0.7,0.22,D+2.7]}/><meshStandardMaterial color="#222" metalness={0.88} roughness={0.28}/></mesh>
+      <mesh position={[ ARENA_X+0.6,3.55,0]}><boxGeometry args={[0.7,0.22,D+2.7]}/><meshStandardMaterial color="#222" metalness={0.88} roughness={0.28}/></mesh>
+      {/* Yellow bumper rails — front/back */}
+      {[-6,-3,0,3,6].map((x,i)=>[
+        <mesh key={`yf-${i}`} position={[x,0.55,-ARENA_Z-0.28]}><boxGeometry args={[2.4,0.45,0.32]}/><meshStandardMaterial color="#ffcc00" metalness={0.62} roughness={0.4}/></mesh>,
+        <mesh key={`yb-${i}`} position={[x,0.55, ARENA_Z+0.28]}><boxGeometry args={[2.4,0.45,0.32]}/><meshStandardMaterial color="#ffcc00" metalness={0.62} roughness={0.4}/></mesh>
+      ])}
+      {/* Yellow bumper rails — sides */}
+      {[-4,0,4].map((z,i)=>[
+        <mesh key={`yl-${i}`} position={[-ARENA_X-0.28,0.55,z]}><boxGeometry args={[0.32,0.45,4.0]}/><meshStandardMaterial color="#ffcc00" metalness={0.62} roughness={0.4}/></mesh>,
+        <mesh key={`yr-${i}`} position={[ ARENA_X+0.28,0.55,z]}><boxGeometry args={[0.32,0.45,4.0]}/><meshStandardMaterial color="#ffcc00" metalness={0.62} roughness={0.4}/></mesh>
+      ])}
+      {/* Yellow corner bumpers — angled 45° */}
+      {([[-ARENA_X-0.25,-ARENA_Z-0.25],[ARENA_X+0.25,-ARENA_Z-0.25],[-ARENA_X-0.25,ARENA_Z+0.25],[ARENA_X+0.25,ARENA_Z+0.25]] as [number,number][]).map(([x,z],i)=>(
+        <mesh key={`cb-${i}`} position={[x,0.55,z]} rotation={[0,Math.PI/4,0]}><boxGeometry args={[1.2,0.5,0.45]}/><meshStandardMaterial color="#ffcc00" metalness={0.6} roughness={0.45}/></mesh>
+      ))}
+      {/* Corner pillars */}
+      {([[-ARENA_X-0.5,-ARENA_Z-0.5],[ARENA_X+0.5,-ARENA_Z-0.5],[-ARENA_X-0.5,ARENA_Z+0.5],[ARENA_X+0.5,ARENA_Z+0.5]] as [number,number][]).map(([x,z],i)=>(
+        <group key={`cp-${i}`} position={[x,0,z]}>
+          <mesh position={[0,2,0]} castShadow><boxGeometry args={[1.1,4,1.1]}/><meshStandardMaterial color="#0a0a0a" metalness={0.95} roughness={0.15}/></mesh>
+          <mesh position={[0,4.1,0]}><boxGeometry args={[1.25,0.2,1.25]}/><meshBasicMaterial color={i<2?"#ff2200":"#0055ff"}/></mesh>
+          <pointLight position={[0,3.8,0]} color={i<2?"#ff2200":"#0055ff"} intensity={1.2} distance={6}/>
+        </group>
+      ))}
+      {/* ── OVERHEAD LIGHTING RIG ── */}
+      <mesh position={[0,7.2,0]}><boxGeometry args={[W+4,0.18,0.18]}/><meshStandardMaterial color="#111" metalness={0.9} roughness={0.2}/></mesh>
+      <mesh position={[0,7.2,0]}><boxGeometry args={[0.18,0.18,D+4]}/><meshStandardMaterial color="#111" metalness={0.9} roughness={0.2}/></mesh>
+      {/* Spotlight housings */}
+      {([[-6,6],[-6,-6],[6,6],[6,-6]] as [number,number][]).map(([x,z],i)=>(
+        <group key={`light-${i}`} position={[x,6.8,z]}>
+          <mesh><cylinderGeometry args={[0.22,0.28,0.4,10]}/><meshStandardMaterial color="#111" metalness={0.9} roughness={0.2}/></mesh>
+          <mesh position={[0,-0.25,0]}><cylinderGeometry args={[0.1,0.22,0.2,10]}/><meshBasicMaterial color="#ddeeff"/></mesh>
+          <pointLight position={[0,-0.4,0]} color="#ddeeff" intensity={8} distance={22} castShadow/>
+        </group>
+      ))}
+      {/* Center overhead wash */}
+      <pointLight position={[0,8,0]} color="#ffffff" intensity={3} distance={28}/>
+      {/* Zone colored lights */}
+      <pointLight position={[0,4,-ARENA_Z+1]} color="#ff2200" intensity={4} distance={10}/>
+      <pointLight position={[0,4, ARENA_Z-1]} color="#2255ff" intensity={4} distance={10}/>
+      {/* ── SPINNING SAWS (corners) ── */}
+      <SpinningSaw pos={[-ARENA_X+2.5,0.1,-ARENA_Z+2.5]} color="#FF3300"/>
+      <SpinningSaw pos={[ ARENA_X-2.5,0.1,-ARENA_Z+2.5]} color="#FF3300"/>
+      <SpinningSaw pos={[-ARENA_X+2.5,0.1, ARENA_Z-2.5]} color="#00CCFF"/>
+      <SpinningSaw pos={[ ARENA_X-2.5,0.1, ARENA_Z-2.5]} color="#00CCFF"/>
+      {/* ── HAZARDS ── */}
+      <HazardScrews/>
+      <HazardSpikes/>
+      <HazardHammer/>
+      <HazardRam/>
+      <HazardWreckingBall/>
+      {/* Flame vent grates (4 corners) */}
+      {([[-ARENA_X+1.5,-ARENA_Z+1.5],[ARENA_X-1.5,-ARENA_Z+1.5],[-ARENA_X+1.5,ARENA_Z-1.5],[ARENA_X-1.5,ARENA_Z-1.5]] as [number,number][]).map(([x,z],i)=>(
+        <mesh key={`vent-${i}`} rotation={[-Math.PI/2,0,0]} position={[x,0.01,z]}><planeGeometry args={[1.2,1.2]}/><meshBasicMaterial color="#111" transparent opacity={0.9}/></mesh>
+      ))}
+      {/* Hazard warning stripes on floor around screws */}
+      {([-7,-3.5,0,3.5,7] as number[]).map((x,i)=>(
+        <mesh key={`hs-${i}`} rotation={[-Math.PI/2,0,0]} position={[x,0.011,-ARENA_Z+0.55]}><planeGeometry args={[1.1,1.0]}/><meshBasicMaterial color={i%2?"#ffcc00":"#111100"} transparent opacity={0.6}/></mesh>
+      ))}
+      <fog attach="fog" args={["#060408",24,60]}/>
+    </group>
+  );
+}
+
 
 // ─── 3D: Impact flash ────────────────────────────────────────────────────────
 function ImpactFlash({ x, y, z, color }: { x: number; y: number; z: number; color: string }) {
@@ -205,7 +438,22 @@ function ImpactFlash({ x, y, z, color }: { x: number; y: number; z: number; colo
   );
 }
 
-// Removed duplicate RobotBody and VehicleWeapon
+function RealisticEnvironment() {
+  const { gl, scene } = useThree();
+  useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const envTexture = pmrem.fromScene(new RoomEnvironment()).texture; 
+    scene.environment = envTexture;
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        child.material.envMap = envTexture;
+        child.material.envMapIntensity = 1.3;
+        child.material.needsUpdate = true;
+      }
+    });
+  }, [gl, scene]);
+  return null;
+}
 
 // ─── 3D: Arena robot ─────────────────────────────────────────────────────────
 function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, lungeDirRef }: {
@@ -253,10 +501,13 @@ function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, 
         <ringGeometry args={[1.1, 1.6, 20]} />
         <meshBasicMaterial color={config.bodyColor} transparent opacity={isHit ? 0.7 : 0.25} />
       </mesh>
-      <Robot3D
-        bodyColor={config.bodyColor} atkColor={config.attackColor} defColor={config.defenseColor}
-        attackPartId={config.attackPartId || "attack-crusher"}
-        isHit={isHit} isAttacking={isAttacking}
+      <HighFidelityRobotMesh 
+        bodyPart={{ id: config.bodyPartId || "body-titan" }}
+        attackPart={{ id: config.attackPartId || "attack-crusher" }}
+        defensePart={{ id: config.defensePartId || "defense-titanium" }}
+        secondaryPart={{ id: config.secondaryWeaponId }}
+        isHit={isHit}
+        isAttacking={isAttacking}
       />
     </group>
   );
@@ -286,7 +537,7 @@ function GameController({
   const aiStateRef    = useRef<AIState>("chase");
   const collisionCool = useRef(0);
   const MIN_DIST = 3.2;
-  const DAMPING  = 0.80;
+  const DAMPING  = 0.88;  // raised from 0.80 — heavy traction, no sliding
 
   useFrame((_, delta) => {
     if (!gameActive) return;
@@ -295,12 +546,16 @@ function GameController({
     p1PosRef.current.z = THREE.MathUtils.clamp(p1PosRef.current.z + p1VelRef.current.z * dt, -ARENA_Z, ARENA_Z);
     p2PosRef.current.x = THREE.MathUtils.clamp(p2PosRef.current.x + p2VelRef.current.x * dt, -ARENA_X, ARENA_X);
     p2PosRef.current.z = THREE.MathUtils.clamp(p2PosRef.current.z + p2VelRef.current.z * dt, -ARENA_Z, ARENA_Z);
-    if (Math.abs(p1PosRef.current.x) >= ARENA_X) p1VelRef.current.x *= -0.4;
-    if (Math.abs(p1PosRef.current.z) >= ARENA_Z) p1VelRef.current.z *= -0.4;
-    if (Math.abs(p2PosRef.current.x) >= ARENA_X) p2VelRef.current.x *= -0.4;
-    if (Math.abs(p2PosRef.current.z) >= ARENA_Z) p2VelRef.current.z *= -0.4;
+    if (Math.abs(p1PosRef.current.x) >= ARENA_X) p1VelRef.current.x *= -0.25;
+    if (Math.abs(p1PosRef.current.z) >= ARENA_Z) p1VelRef.current.z *= -0.25;
+    if (Math.abs(p2PosRef.current.x) >= ARENA_X) p2VelRef.current.x *= -0.25;
+    if (Math.abs(p2PosRef.current.z) >= ARENA_Z) p2VelRef.current.z *= -0.25;
     const damp = Math.pow(DAMPING, dt * 60);
+    // Apply strong lateral damping to kill sideways drift
     p1VelRef.current.x *= damp; p1VelRef.current.z *= damp;
+    if (!keysRef.current.has("KeyA") && !keysRef.current.has("ArrowLeft") && !keysRef.current.has("KeyD") && !keysRef.current.has("ArrowRight")) {
+      p1VelRef.current.x *= Math.pow(0.78, dt * 60);
+    }
     p2VelRef.current.x *= damp; p2VelRef.current.z *= damp;
     const spd = (p1Speed / 100) * 9;
     const k   = keysRef.current;
@@ -711,9 +966,11 @@ export default function Battle() {
           <WebGLErrorBoundary>
             <Canvas
               camera={{ fov: 58, position: [0, 11, 15], near: 0.1, far: 200 }}
-              gl={{ antialias: false, powerPreference: "high-performance" }}
-              dpr={[1, 1.5]}
+              gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
+              dpr={[1, 2]}
+              shadows
             >
+              <RealisticEnvironment />
               <ambientLight intensity={3.5} color="#ffffff" />
               <directionalLight position={[0, 20, 5]} intensity={4.0} color="#ffffff" />
               <pointLight position={[-7, 4, 0]} intensity={6} color="#FF4400" distance={25} />

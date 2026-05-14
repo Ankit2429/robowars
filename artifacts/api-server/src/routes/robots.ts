@@ -65,10 +65,13 @@ function computeStats(bodyId: string, attackId: string, defenseId: string, secon
 router.get("/robots", async (req, res) => {
   try {
     const robots = await db.select().from(robotsTable).orderBy(robotsTable.createdAt);
-    res.json(robots.map(r => ({ ...r, createdAt: r.createdAt.toISOString() })));
-  } catch (err) {
-    req.log.error({ err }, "Failed to list robots");
-    res.status(500).json({ error: "Failed to list robots" });
+    res.json(robots.map(r => ({
+      ...r,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : new Date(r.createdAt).toISOString()
+    })));
+  } catch (err: any) {
+    req.log.error({ err: err.message, stack: err.stack }, "Failed to list robots");
+    res.status(500).json({ error: "Failed to list robots", message: err.message });
   }
 });
 

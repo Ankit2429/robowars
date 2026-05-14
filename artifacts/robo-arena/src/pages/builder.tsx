@@ -1,10 +1,13 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { WebGLErrorBoundary } from "@/components/WebGLErrorBoundary";
 import { useWebGLSupported } from "@/hooks/useWebGL";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, Float, Sparkles, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+
+import { HighFidelityRobotMesh } from "../components/RobotParts3D";
 import { useListParts, useCreateRobot } from "@workspace/api-client-react";
 import type { RobotPart } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,211 +18,29 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
 
-
-
-// ── 3-D secondary weapon attachment ──────────────────────────────────────────
-function SecondaryWeapon3D({ defColor, name }: { defColor: string; name: string }) {
-  const isCrossbow = name.toLowerCase().includes("crossbow");
-  const isRocket = name.toLowerCase().includes("rocket") || name.toLowerCase().includes("harpoon");
-  const isTail = name.toLowerCase().includes("tail");
-
-  if (isCrossbow) {
-    return (
-      <group position={[0, 1.2, -0.4]}>
-        <mesh rotation={[0, Math.PI/4, 0]} castShadow><boxGeometry args={[1.6, 0.2, 0.2]} /><meshStandardMaterial color={defColor} /></mesh>
-        <mesh rotation={[0, -Math.PI/4, 0]} castShadow><boxGeometry args={[1.6, 0.2, 0.2]} /><meshStandardMaterial color={defColor} /></mesh>
-      </group>
-    );
-  }
-  if (isRocket) {
-    return (
-      <group position={[0, 1.2, -0.4]}>
-        <mesh rotation={[-0.2, 0, 0]} castShadow><boxGeometry args={[1.2, 0.6, 0.8]} /><meshStandardMaterial color={defColor} /></mesh>
-      </group>
-    );
-  }
-  if (isTail) {
-    return (
-      <group position={[0, 1.2, -1.0]}>
-        <mesh rotation={[0.4, 0, 0]} castShadow><boxGeometry args={[0.3, 1.0, 0.3]} /><meshStandardMaterial color={defColor} /></mesh>
-      </group>
-    );
-  }
-  // Default turret
-  return (
-    <group position={[0, 1.2, -0.4]}>
-      <mesh castShadow><boxGeometry args={[0.6, 0.4, 0.6]} /><meshStandardMaterial color={defColor} /></mesh>
-      <mesh position={[0, 0, 0.6]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color="#333" /></mesh>
-    </group>
-  );
-}
-
-// ── 3-D weapon attachments ─────────────────────────────────────────────────────
-function VehicleWeapon({ atkColor, name }: { atkColor: string; name: string }) {
-  const isDrill = name.toLowerCase().includes("drill");
-  const isPincer = name.toLowerCase().includes("bite");
-  const isRoller = name.toLowerCase().includes("horn") || name.toLowerCase().includes("spin blade");
+function RealisticEnvironment() {
+  const { gl, scene } = useThree();
   
-  if (isDrill) {
-    return (
-      <group position={[0, 0.32, 1.8]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <coneGeometry args={[0.5, 1.2, 8]} />
-          <meshStandardMaterial color={atkColor} metalness={0.4} roughness={0.35} emissive={atkColor} emissiveIntensity={0.5} />
-        </mesh>
-      </group>
-    );
-  }
-  if (isPincer) {
-    return (
-      <group position={[0, 0.32, 1.6]}>
-        <mesh position={[-0.4, 0, 0]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color={atkColor} /></mesh>
-        <mesh position={[0.4, 0, 0]} castShadow><boxGeometry args={[0.2, 0.2, 1.0]} /><meshStandardMaterial color={atkColor} /></mesh>
-      </group>
-    );
-  }
-  if (isRoller) {
-    return (
-      <group position={[0, 0.32, 1.8]}>
-        <mesh rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.3, 0.3, 1.6, 8]} /><meshStandardMaterial color={atkColor} /></mesh>
-      </group>
-    );
-  }
+  useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    pmrem.compileEquirectangularShader();
+    const envTexture = pmrem.fromScene(new RoomEnvironment()).texture;
+    scene.environment = envTexture;
 
-  // Default wedge/lifter
-  return (
-    <group position={[0, 0.32, 1.52]}>
-      <mesh position={[0, 0.04, -0.12]} castShadow>
-        <boxGeometry args={[1.15, 0.22, 0.3]} />
-        <meshStandardMaterial color={atkColor} metalness={0.4} roughness={0.35}
-          emissive={atkColor} emissiveIntensity={0.5} />
-      </mesh>
-      {([-0.52, -0.17, 0.17, 0.52] as const).map((x, i) => (
-        <mesh key={i} position={[x, -0.02, i % 2 === 0 ? 0.35 : 0.5]} castShadow>
-          <boxGeometry args={[0.15, 0.22, 0.88]} />
-          <meshStandardMaterial color={atkColor} metalness={0.35} roughness={0.3}
-            emissive={atkColor} emissiveIntensity={0.7} />
-        </mesh>
-      ))}
-    </group>
-  );
+    // Apply to all existing materials
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        child.material.envMap = envTexture;
+        child.material.envMapIntensity = 1.2;
+        child.material.needsUpdate = true;
+      }
+    });
+  }, [gl, scene]);
+
+  return null;
 }
 
-// ── 3-D vehicle robot preview ──────────────────────────────────────────────────
-function RobotMesh({ bodyPart, attackPart, defensePart, secondaryPart }: {
-  bodyPart?: RobotPart; attackPart?: RobotPart; defensePart?: RobotPart; secondaryPart?: RobotPart;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
 
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.8) * 0.05;
-    }
-  });
-
-  const bodyColor = bodyPart?.color  || "#3a7bd5";
-  const atkColor  = attackPart?.color  || "#dc143c";
-  const defColor  = defensePart?.color || "#00bfff";
-  const isShield  = defensePart?.name.toLowerCase().includes("shield") ||
-                    defensePart?.name.toLowerCase().includes("energy");
-
-  return (
-    <group ref={groupRef}>
-      <mesh position={[0, 0.32, 0]} castShadow>
-        <boxGeometry args={[2.0, 0.52, 2.9]} />
-        <meshStandardMaterial color={bodyColor} metalness={0.45} roughness={0.4}
-          emissive={bodyColor} emissiveIntensity={0.28} />
-      </mesh>
-      <mesh position={[0, 0.5, 1.5]} rotation={[0.45, 0, 0]} castShadow>
-        <boxGeometry args={[1.8, 0.52, 0.2]} />
-        <meshStandardMaterial color={bodyColor} metalness={0.55} roughness={0.35}
-          emissive={bodyColor} emissiveIntensity={0.35} />
-      </mesh>
-      {([-1.1, 1.1] as const).map((x, i) => (
-        <group key={i}>
-          <mesh position={[x, 0.44, 0]} castShadow>
-            <boxGeometry args={[0.17, 0.66, 2.6]} />
-            <meshStandardMaterial color={defColor} metalness={0.4} roughness={0.38}
-              emissive={defColor} emissiveIntensity={0.38} />
-          </mesh>
-          {([-0.88, 0, 0.88] as const).map((z, j) => (
-            <mesh key={j} position={[x + (x > 0 ? 0.09 : -0.09), 0.5, z]}>
-              <sphereGeometry args={[0.065, 6, 6]} />
-              <meshBasicMaterial color={defColor} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <mesh position={[0, 0.76, -0.38]} castShadow>
-        <boxGeometry args={[1.05, 0.44, 1.32]} />
-        <meshStandardMaterial color={bodyColor} metalness={0.5} roughness={0.38}
-          emissive={bodyColor} emissiveIntensity={0.42} />
-      </mesh>
-      <mesh position={[0, 0.79, 0.34]}>
-        <boxGeometry args={[0.78, 0.11, 0.06]} />
-        <meshBasicMaterial color={atkColor} />
-      </mesh>
-      <mesh position={[0, 1.0, -0.38]}>
-        <cylinderGeometry args={[0.23, 0.23, 0.1, 10]} />
-        <meshStandardMaterial color={bodyColor} metalness={0.7} roughness={0.3}
-          emissive={bodyColor} emissiveIntensity={0.5} />
-      </mesh>
-      {([-0.62, 0.62] as const).map((x, i) => (
-        <mesh key={i} position={[x, 0.38, 1.47]}>
-          <boxGeometry args={[0.22, 0.1, 0.05]} />
-          <meshBasicMaterial color={atkColor} />
-        </mesh>
-      ))}
-      {([[-1.0, 0.27, 1.02], [1.0, 0.27, 1.02], [-1.0, 0.27, -1.02], [1.0, 0.27, -1.02]] as const).map(([x, y, z], i) => (
-        <group key={i}>
-          <mesh position={[x, y, z]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.34, 0.34, 0.3, 16]} />
-            <meshStandardMaterial color="#0d0d0d" metalness={0.85} roughness={0.4} />
-          </mesh>
-          <mesh position={[x, y, z]} rotation={[0, 0, Math.PI / 2]}>
-            <torusGeometry args={[0.32, 0.06, 6, 16]} />
-            <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.7} />
-          </mesh>
-          <mesh position={[x + (x > 0 ? 0.16 : -0.16), y, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.16, 0.16, 0.07, 8]} />
-            <meshStandardMaterial color={defColor} metalness={0.7} emissive={defColor} emissiveIntensity={0.45} />
-          </mesh>
-        </group>
-      ))}
-      <VehicleWeapon atkColor={atkColor} name={attackPart?.name || ""} />
-      {secondaryPart && (
-        <SecondaryWeapon3D defColor={secondaryPart.color || "#ffaa00"} name={secondaryPart.name} />
-      )}
-      {isShield ? (
-        <>
-          {([-1.28, 1.28] as const).map((x, i) => (
-            <mesh key={i} position={[x, 0.52, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <planeGeometry args={[2.5, 0.65]} />
-              <meshStandardMaterial color={defColor} emissive={defColor} emissiveIntensity={0.75}
-                transparent opacity={0.35} side={THREE.DoubleSide} />
-            </mesh>
-          ))}
-        </>
-      ) : (
-        <mesh position={[0, 0.42, -1.55]} castShadow>
-          <boxGeometry args={[1.78, 0.6, 0.18]} />
-          <meshStandardMaterial color={defColor} metalness={0.45} roughness={0.35}
-            emissive={defColor} emissiveIntensity={0.4} />
-        </mesh>
-      )}
-      {([-0.5, 0.5] as const).map((x, i) => (
-        <mesh key={i} position={[x, 0.56, -1.52]}>
-          <cylinderGeometry args={[0.09, 0.07, 0.4, 8]} />
-          <meshStandardMaterial color="#111" emissive={atkColor} emissiveIntensity={0.7} />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.6, 2.5, 32]} />
-        <meshBasicMaterial color={bodyColor} transparent opacity={0.22} />
-      </mesh>
-    </group>
-  );
-}
 
 function StatBar({ icon: Icon, label, value, barColor }: { icon: any; label: string; value: number; barColor: string }) {
   return (
@@ -247,6 +68,7 @@ export default function Builder() {
   const { session, deductPoints, calcPartCost } = useSession();
 
   const { data: parts, isLoading: partsLoading } = useListParts();
+
   const createRobot = useCreateRobot();
 
   const [activeTab, setActiveTab] = useState<"body" | "attack" | "secondary" | "defense" | "finalize">("body");
@@ -262,15 +84,25 @@ export default function Builder() {
   const secondaryParts = useMemo(() => parts?.filter(p => p.category === "secondary") || [], [parts]);
   const defenseParts   = useMemo(() => parts?.filter(p => p.category === "defense")   || [], [parts]);
 
-  if (!selectedBodyId    && bodyParts.length    > 0) setSelectedBodyId(bodyParts[0].id);
-  if (!selectedAttackId  && attackParts.length  > 0) setSelectedAttackId(attackParts[0].id);
-  if (!selectedSecondaryId && secondaryParts.length > 0) setSelectedSecondaryId(secondaryParts[0].id);
-  if (!selectedDefenseId && defenseParts.length > 0) setSelectedDefenseId(defenseParts[0].id);
+  // Strict initialization guard to prevent duplicate state insertion
+  const [initialized, setInitialized] = useState(false);
 
-  const selectedBody      = bodyParts.find(p => p.id === selectedBodyId);
-  const selectedAttack    = attackParts.find(p => p.id === selectedAttackId);
-  const selectedSecondary = secondaryParts.find(p => p.id === selectedSecondaryId);
-  const selectedDefense   = defenseParts.find(p => p.id === selectedDefenseId);
+  useEffect(() => {
+    if (initialized) return;
+    if (bodyParts.length > 0 && attackParts.length > 0 && secondaryParts.length > 0 && defenseParts.length > 0) {
+      setSelectedBodyId(prev => prev || bodyParts[0].id);
+      setSelectedAttackId(prev => prev || attackParts[0].id);
+      setSelectedSecondaryId(prev => prev || secondaryParts[0].id);
+      setSelectedDefenseId(prev => prev || defenseParts[0].id);
+      setInitialized(true);
+    }
+  }, [bodyParts, attackParts, secondaryParts, defenseParts, initialized]);
+
+  const selectedBody      = bodyParts.find(p => p.id === selectedBodyId) || bodyParts[0];
+  const selectedAttack    = attackParts.find(p => p.id === selectedAttackId) || attackParts[0];
+  const selectedSecondary = secondaryParts.find(p => p.id === selectedSecondaryId) || secondaryParts[0];
+  const selectedDefense   = defenseParts.find(p => p.id === selectedDefenseId) || defenseParts[0];
+
 
   const totalStats = useMemo(() => ({
     armor:  (selectedBody?.stats.armor  || 0) + (selectedAttack?.stats.armor  || 0) + (selectedSecondary?.stats.armor  || 0) + (selectedDefense?.stats.armor  || 0),
@@ -352,27 +184,46 @@ export default function Builder() {
 
         {webGLSupported ? (
           <WebGLErrorBoundary>
-            <Canvas camera={{ fov: 48, position: [0, 4.2, 8.5] }}>
+            <Canvas 
+              camera={{ fov: 48, position: [0, 4.2, 8.5] }}
+              gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
+              shadows={{ type: THREE.PCFSoftShadowMap }}
+            >
               <PerspectiveCamera makeDefault position={[0, 4.2, 8.5]} fov={48} />
-              <color attach="background" args={["#0d0d1a"]} />
-              <fog attach="fog" args={["#0d0d1a", 8, 22]} />
-              <ambientLight intensity={2.8} color="#ffffff" />
-              <pointLight position={[0, 6, 4]} intensity={4} color="#ffffff" />
-              <spotLight position={[5, 10, 5]}  angle={0.35} penumbra={1} intensity={4} color="#FF6020" />
-              <spotLight position={[-5, 10, -5]} angle={0.35} penumbra={1} intensity={4} color="#00E5FF" />
-              <pointLight position={[0, -1, 0]} intensity={2} color={selectedBody?.color || "#FF4500"} />
+              <color attach="background" args={[0x0a0a0f]} />
+              <fogExp2 attach="fog" args={[0x0a0a0f, 0.035]} />
+              
+              <RealisticEnvironment />
+              
+              {/* Key light — main dramatic shadow */}
+              <directionalLight position={[5, 8, 5]} intensity={2.5} color={0xfff5e8} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} shadow-bias={-0.001} />
+              {/* Cool blue fill from left */}
+              <directionalLight position={[-4, 3, -2]} intensity={0.8} color={0x4488cc} />
+              {/* Orange rim light from behind */}
+              <directionalLight position={[0, -2, -5]} intensity={0.6} color={0xff6622} />
+              {/* Overhead fill */}
+              <pointLight position={[0, 6, 0]} intensity={1.0} color={0xffffff} distance={20} />
+              {/* Dark ambient */}
+              <ambientLight intensity={0.4} color={0x223344} />
+
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]} receiveShadow>
+                <planeGeometry args={[20, 20]} />
+                <meshStandardMaterial color={0x111111} metalness={0.3} roughness={0.7} />
+              </mesh>
+              <gridHelper args={[12, 24, 0x222222, 0x1a1a1a]} position={[0, -0.59, 0]} />
+
+              
               <Sparkles count={60} scale={6} size={2.5} speed={0.4} opacity={0.6} color={selectedAttack?.color || "#FF4500"} />
-              <mesh receiveShadow position={[0, -0.5, 0]}>
-                <cylinderGeometry args={[2.5, 3, 1, 32]} />
-                <meshStandardMaterial color="#1a1a2e" metalness={0.7} roughness={0.3} />
-              </mesh>
-              <mesh receiveShadow position={[0, 0.02, 0]}>
-                <cylinderGeometry args={[2.0, 2.2, 0.18, 32]} />
-                <meshStandardMaterial color="#22223b" metalness={0.9} roughness={0.1}
-                  emissive={selectedBody?.color || "#FF4500"} emissiveIntensity={0.5} />
-              </mesh>
+              
               <Float speed={2} rotationIntensity={0.08} floatIntensity={0.18}>
-                <RobotMesh bodyPart={selectedBody} attackPart={selectedAttack} defensePart={selectedDefense} secondaryPart={selectedSecondary} />
+                <HighFidelityRobotMesh 
+                  bodyPart={selectedBody} 
+                  attackPart={selectedAttack} 
+                  defensePart={selectedDefense} 
+                  secondaryPart={selectedSecondary} 
+                  isForging={activeTab === "finalize"}
+                />
+
               </Float>
               <ContactShadows position={[0, 0.1, 0]} opacity={0.6} scale={5} blur={2} far={4} />
               <OrbitControls
