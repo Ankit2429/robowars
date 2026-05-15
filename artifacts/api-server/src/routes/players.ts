@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { playersTable, accessCodesTable } from "@workspace/db";
+import { db, client } from "@workspace/db";
+import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,6 +12,29 @@ const RegisterBody = z.object({
   branch: z.string(),
   code: z.string(),
 });
+
+// Ensure the players table exists — called once on first request
+let tableEnsured = false;
+async function ensurePlayersTable() {
+  if (tableEnsured) return;
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        usn TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        access_code TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Registered',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+    tableEnsured = true;
+    console.log("[Players] players table ensured");
+  } catch (err: any) {
+    console.error("[Players] FAILED to ensure players table:", err.message);
+  }
+}
 
 router.post("/players/register", async (req, res): Promise<void> => {
   req.log.info({ body: req.body }, "Registration attempt received");
@@ -36,12 +59,15 @@ router.post("/players/register", async (req, res): Promise<void> => {
   }
   req.log.info({ code }, "Access code accepted");
 
-  // Step 3: Check for duplicate USN
+  // Step 2.5: Ensure table exists before any DB query
+  await ensurePlayersTable();
+
+  // Step 3: Check for duplicate USN using raw SQL (bypasses Drizzle ORM issues)
   try {
-    req.log.info({ usn }, "Checking for existing USN...");
-    const existing = await db.select().from(playersTable).where(eq(playersTable.usn, usn));
-    req.log.info({ existingCount: existing.length, usn }, "USN lookup result");
-    if (existing.length > 0) {
+    req.log.info({ usn }, "Checking for existing USN via raw SQL...");
+    const result = await client.query("SELECT id FROM players WHERE usn = $1", [usn]);
+    req.log.info({ rowCount: result.rows.length, usn }, "USN lookup result");
+    if (result.rows.length > 0) {
       req.log.warn({ usn }, "USN already registered — rejected");
       res.status(409).json({ error: "USN already registered" });
       return;
@@ -52,17 +78,14 @@ router.post("/players/register", async (req, res): Promise<void> => {
     return;
   }
 
-  // Step 4: Insert new player
+  // Step 4: Insert new player using raw SQL
   try {
-    req.log.info({ name, usn, branch, code }, "Inserting new player...");
-    const [player] = await db.insert(playersTable).values({
-      name,
-      usn,
-      branch,
-      accessCode: code,
-      status: "Registered",
-    }).returning();
-
+    req.log.info({ name, usn, branch, code }, "Inserting new player via raw SQL...");
+    const result = await client.query(
+      "INSERT INTO players (usn, name, branch, access_code, status) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [usn, name, branch, code, "Registered"]
+    );
+    const player = result.rows[0] as any;
     req.log.info({ playerId: player.id, usn, name }, "Player registered successfully");
     res.status(201).json(player);
   } catch (err: any) {
@@ -72,9 +95,10 @@ router.post("/players/register", async (req, res): Promise<void> => {
 });
 
 router.get("/players", async (req, res) => {
+  await ensurePlayersTable();
   try {
-    const players = await db.select().from(playersTable);
-    res.json(players);
+    const result = await client.query("SELECT * FROM players ORDER BY id DESC");
+    res.json(result.rows);
   } catch (err: any) {
     req.log.error({ err: err.message, stack: err.stack }, "FAILED to list players");
     res.status(500).json({ error: "Failed to list players", detail: err.message });
