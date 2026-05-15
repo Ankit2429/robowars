@@ -45,9 +45,38 @@ async function boot() {
 
 async function ensureSchema() {
   const { client } = await import("@workspace/db");
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS robots (
+
+  const tables = [
+    {
+      name: "players",
+      sql: `CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        usn TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        access_code TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Registered',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "access_codes",
+      sql: `CREATE TABLE IF NOT EXISTS access_codes (
+        code TEXT PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "settings",
+      sql: `CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "robots",
+      sql: `CREATE TABLE IF NOT EXISTS robots (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         player_name TEXT NOT NULL,
@@ -58,8 +87,11 @@ async function ensureSchema() {
         total_stats JSONB NOT NULL,
         special_ability TEXT,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS rooms (
+      )`,
+    },
+    {
+      name: "rooms",
+      sql: `CREATE TABLE IF NOT EXISTS rooms (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         host_name TEXT,
@@ -67,8 +99,11 @@ async function ensureSchema() {
         player_count INTEGER NOT NULL DEFAULT 1,
         max_players INTEGER NOT NULL DEFAULT 2,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS leaderboard (
+      )`,
+    },
+    {
+      name: "leaderboard",
+      sql: `CREATE TABLE IF NOT EXISTS leaderboard (
         id SERIAL PRIMARY KEY,
         player_name TEXT NOT NULL UNIQUE,
         wins INTEGER NOT NULL DEFAULT 0,
@@ -77,30 +112,19 @@ async function ensureSchema() {
         win_rate REAL NOT NULL DEFAULT 0,
         favorite_robot TEXT,
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS players (
-        id SERIAL PRIMARY KEY,
-        usn TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        branch TEXT NOT NULL,
-        access_code TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'Registered',
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS access_codes (
-        code TEXT PRIMARY KEY,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-    `);
-  } catch (err: any) {
-    logger.error({ err: err.message }, "Failed to ensure database schema");
-    // Don't throw, let the app try to run
+      )`,
+    },
+  ];
+
+  for (const table of tables) {
+    try {
+      await client.query(table.sql);
+      logger.info({ table: table.name }, "Table ensured");
+    } catch (err: any) {
+      logger.error({ table: table.name, err: err.message, stack: err.stack }, "FAILED to create table");
+    }
   }
 }
+
 
 boot();
