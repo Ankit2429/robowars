@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { customFetch } from "@workspace/api-client-react";
+import { io, Socket } from "socket.io-client";
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -11,17 +12,31 @@ export default function Admin() {
   
   const [players, setPlayers] = useState<any[]>([]);
   const [matchmakingActive, setMatchmakingActive] = useState(false);
+  const [queueCount, setQueueCount] = useState(0);
   const [codes, setCodes] = useState<string[]>([]);
   const [newCode, setNewCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     document.body.classList.add('cyber-landing');
     if (isAuthenticated) {
       refreshData();
+      
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+      const socket = io(apiUrl, {
+        path: "/socket.io",
+        transports: ["websocket", "polling"]
+      });
+      socketRef.current = socket;
+      
+      socket.on("queueUpdate", ({ count }) => {
+        setQueueCount(count);
+      });
     }
     return () => {
       document.body.classList.remove('cyber-landing');
+      socketRef.current?.disconnect();
     };
   }, [isAuthenticated]);
 
@@ -188,7 +203,11 @@ export default function Admin() {
             <div>
               <div className="bracket-header">
                 <h2>Tournament & Matchmaking</h2>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--primary-dim)' }}>
+                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{queueCount}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Players Queued</span>
+                  </div>
                   <button 
                     className={`btn ${matchmakingActive ? '' : 'primary-btn'}`} 
                     style={matchmakingActive ? { backgroundColor: '#e74c3c', color: 'white' } : {}}

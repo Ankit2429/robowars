@@ -5,6 +5,8 @@ import { roomsTable, leaderboardTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./lib/logger";
 
+import { globalEvents, EVENTS } from "./lib/events";
+
 interface Player {
   socketId: string;
   playerName: string;
@@ -31,11 +33,25 @@ export function setupSocketIO(server: HttpServer) {
     transports: ["websocket", "polling"],
   });
 
+  // Listen for admin changes and broadcast to all players
+  globalEvents.on(EVENTS.MATCHMAKING_STATUS_CHANGED, (active: boolean) => {
+    logger.info({ active }, "Broadcasting matchmaking status change");
+    io.emit("matchmakingStatusChanged", { active });
+  });
+
+  const broadcastQueueUpdate = () => {
+    const count = matchQueue.length;
+    logger.debug({ count }, "Broadcasting queue update");
+    io.emit("queueUpdate", { count });
+  };
+
   io.on("connection", (socket) => {
-    logger.info({ socketId: socket.id }, "Socket connected");
+    logger.info({ socketId: socket.id, transport: socket.conn.transport.name }, "Socket connected");
 
     // ── Matchmaking ────────────────────────────────────────────────────────────
     socket.on("findMatch", ({ playerName, robotId }: { playerName: string; robotId?: number }) => {
+      logger.info({ socketId: socket.id, playerName, robotId }, "Player requesting match");
+      
       // Remove any existing entry for this socket
       const existingIdx = matchQueue.findIndex(p => p.socketId === socket.id);
       if (existingIdx !== -1) matchQueue.splice(existingIdx, 1);
@@ -44,17 +60,21 @@ export function setupSocketIO(server: HttpServer) {
       socket.data.inQueue = true;
       socket.data.playerName = playerName;
 
-      logger.info({ playerName, queueLength: matchQueue.length }, "Player queued for match");
+      logger.info({ playerName, queueLength: matchQueue.length }, "Player added to matchQueue");
+      broadcastQueueUpdate();
 
       if (matchQueue.length >= 2) {
         const p1 = matchQueue.shift()!;
         const p2 = matchQueue.shift()!;
         const roomId = `match_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+        logger.info({ p1: p1.playerName, p2: p2.playerName, roomId }, "Match found — creating room");
         rooms.set(roomId, { players: [], status: "waiting" });
 
         io.to(p1.socketId).emit("matchFound", { roomId, opponentName: p2.playerName, side: "p1" });
         io.to(p2.socketId).emit("matchFound", { roomId, opponentName: p1.playerName, side: "p2" });
+
+        broadcastQueueUpdate();
 
         db.insert(roomsTable).values({
           id: roomId,
@@ -63,15 +83,19 @@ export function setupSocketIO(server: HttpServer) {
           status: "waiting",
           playerCount: 0,
           maxPlayers: 2,
-        }).catch(err => logger.error({ err }, "Failed to create match room"));
+        }).catch(err => logger.error({ err }, "Failed to create match room record in DB"));
       } else {
         socket.emit("matchSearching");
       }
     });
 
     socket.on("cancelMatch", () => {
+      logger.info({ socketId: socket.id, playerName: socket.data.playerName }, "Player canceled matchmaking");
       const idx = matchQueue.findIndex(p => p.socketId === socket.id);
-      if (idx !== -1) matchQueue.splice(idx, 1);
+      if (idx !== -1) {
+        matchQueue.splice(idx, 1);
+        broadcastQueueUpdate();
+      }
       socket.data.inQueue = false;
     });
 
@@ -171,17 +195,27 @@ export function setupSocketIO(server: HttpServer) {
 
     // ── Disconnect ─────────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-      logger.info({ socketId: socket.id }, "Socket disconnected");
+      logger.info({ 
+        socketId: socket.id, 
+        playerName: socket.data.playerName, 
+        inQueue: socket.data.inQueue,
+        roomId: socket.data.roomId 
+      }, "Socket disconnected");
 
       // Remove from matchmaking queue
       const qIdx = matchQueue.findIndex(p => p.socketId === socket.id);
-      if (qIdx !== -1) matchQueue.splice(qIdx, 1);
+      if (qIdx !== -1) {
+        matchQueue.splice(qIdx, 1);
+        logger.info({ playerName: socket.data.playerName }, "Player removed from queue due to disconnect");
+        broadcastQueueUpdate();
+      }
 
       const roomId = socket.data.roomId as string | undefined;
       if (roomId) {
         const room = rooms.get(roomId);
         if (room) {
           room.players = room.players.filter(p => p.socketId !== socket.id);
+          logger.info({ playerName: socket.data.playerName, roomId }, "Player removed from room due to disconnect");
           io.to(roomId).emit("playerLeft", { playerName: socket.data.playerName });
         }
       }

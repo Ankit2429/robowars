@@ -14,55 +14,83 @@ interface StoredRobot {
   stats: { armor: number; power: number; speed: number; energy: number };
 }
 
+import { io, Socket } from "socket.io-client";
+
 export default function Play() {
   const [, setLocation] = useLocation();
   const [myRobot, setMyRobot] = useState<StoredRobot | null>(null);
-  const { loadDB } = useMockDB();
   const [matchState, setMatchState] = useState<"idle" | "awaiting_admin" | "searching" | "found">("idle");
   const [searchTime, setSearchTime] = useState(0);
   const [found, setFound] = useState<{ opponentName: string; roomId: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("roboArena_robot");
     if (saved) setMyRobot(JSON.parse(saved));
+
+    // Initialize socket connection
+    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const socket = io(apiUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"]
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => console.log("[Play] Socket connected"));
+    socket.on("matchmakingStatusChanged", ({ active }) => {
+      console.log("[Play] Matchmaking status changed:", active);
+      if (active) {
+        setMatchState(prev => prev === "awaiting_admin" ? "searching" : prev);
+      } else {
+        setMatchState(prev => prev === "searching" ? "awaiting_admin" : prev);
+      }
+    });
+
+    socket.on("matchFound", ({ roomId, opponentName }) => {
+      console.log("[Play] Match found!", { roomId, opponentName });
+      setFound({ opponentName, roomId });
+      setMatchState("found");
+      setTimeout(() => {
+        setLocation(`/battle/${roomId}`);
+      }, 3000);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   useEffect(() => {
     if (matchState === "searching") {
       timerRef.current = setInterval(() => setSearchTime(t => t + 1), 1000);
+      
+      // Notify backend we are searching
+      if (socketRef.current && myRobot) {
+        socketRef.current.emit("findMatch", { 
+          playerName: myRobot.playerName, 
+          robotId: (myRobot as any).robotId 
+        });
+      }
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
       setSearchTime(0);
+      if (matchState === "idle" && socketRef.current) {
+        socketRef.current.emit("cancelMatch");
+      }
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [matchState]);
+  }, [matchState, myRobot]);
 
   useEffect(() => {
     if (matchState === "awaiting_admin") {
-      const interval = setInterval(async () => {
-        try {
-          const settings = await customFetch<any>("/api/settings");
-          if (settings.matchmakingActive) {
-            clearInterval(interval);
-            setMatchState("searching");
-          }
-        } catch (err) {
-          console.error("[Play] Failed to check matchmaking status:", err);
+      // Initial check
+      customFetch<any>("/api/settings").then(settings => {
+        if (settings.matchmakingActive) {
+          setMatchState("searching");
         }
-      }, 3000);
-      return () => clearInterval(interval);
-    } else if (matchState === "searching") {
-      const timeout = setTimeout(() => {
-        setFound({ opponentName: "XENON_GHOST (CPU)", roomId: "ai" });
-        setMatchState("found");
-        setTimeout(() => {
-          setLocation("/battle/ai");
-        }, 3000);
-      }, 3000);
-      return () => clearTimeout(timeout);
+      }).catch(err => console.error("[Play] Initial settings check failed:", err));
     }
-    return undefined;
   }, [matchState]);
 
   const handleFindMatch = () => {
@@ -209,10 +237,15 @@ export default function Play() {
                       {Math.floor(searchTime / 60).toString().padStart(2,"0")}:{(searchTime % 60).toString().padStart(2,"0")}
                     </p>
                   </div>
-                  <p className="font-mono text-xs text-muted-foreground text-center">Waiting for an opponent...</p>
-                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2 mt-2">
-                    <X className="h-4 w-4" /> CANCEL
-                  </button>
+                  <div className="flex flex-col gap-2 w-full max-w-[200px]">
+                    <button onClick={handleAITraining} className="brutal-button px-4 py-2 text-xs border-secondary text-secondary hover:bg-secondary hover:text-black transition-colors">
+                      <Bot className="h-4 w-4 inline mr-2" /> PLAY VS AI
+                    </button>
+                    <button onClick={handleCancel} className="brutal-button px-4 py-2 text-xs flex items-center justify-center gap-2">
+                      <X className="h-4 w-4" /> CANCEL
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground text-center mt-2">Waiting for an opponent...</p>
                 </>
               )}
             </div>

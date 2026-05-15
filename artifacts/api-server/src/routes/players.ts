@@ -14,8 +14,10 @@ const RegisterBody = z.object({
 });
 
 router.post("/players/register", async (req, res): Promise<void> => {
+  req.log.info({ body: req.body }, "Registration attempt received");
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
+    req.log.warn({ errors: parsed.error.issues }, "Registration validation failed");
     res.status(400).json({ error: "Invalid registration data", details: parsed.error.issues });
     return;
   }

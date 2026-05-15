@@ -21,6 +21,11 @@ async function boot() {
     logger.info({ port }, "Configuration loaded");
 
     const server = createServer(app);
+    
+    // Ensure database schema exists before starting
+    await ensureSchema();
+    logger.info("Database schema verified");
+
     setupSocketIO(server);
     logger.info("Socket.IO initialized");
 
@@ -35,6 +40,66 @@ async function boot() {
   } catch (err: any) {
     logger.error({ err: err.message, stack: err.stack }, "FATAL BOOT FAILURE");
     process.exit(1);
+  }
+}
+
+async function ensureSchema() {
+  const { client } = await import("@workspace/db");
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS robots (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        body_part_id TEXT NOT NULL,
+        attack_part_id TEXT NOT NULL,
+        defense_part_id TEXT NOT NULL,
+        secondary_weapon_id TEXT,
+        total_stats JSONB NOT NULL,
+        special_ability TEXT,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        host_name TEXT,
+        status TEXT NOT NULL DEFAULT 'waiting',
+        player_count INTEGER NOT NULL DEFAULT 1,
+        max_players INTEGER NOT NULL DEFAULT 2,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS leaderboard (
+        id SERIAL PRIMARY KEY,
+        player_name TEXT NOT NULL UNIQUE,
+        wins INTEGER NOT NULL DEFAULT 0,
+        losses INTEGER NOT NULL DEFAULT 0,
+        total_battles INTEGER NOT NULL DEFAULT 0,
+        win_rate REAL NOT NULL DEFAULT 0,
+        favorite_robot TEXT,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        usn TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        access_code TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Registered',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS access_codes (
+        code TEXT PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+  } catch (err: any) {
+    logger.error({ err: err.message }, "Failed to ensure database schema");
+    // Don't throw, let the app try to run
   }
 }
 
