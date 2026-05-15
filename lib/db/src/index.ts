@@ -4,12 +4,39 @@ import * as schema from "./schema";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { isMainThread } from "node:worker_threads";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.resolve(__dirname, "../../../database-pglite");
+
+// Allow overriding via environment variable for Render Persistent Disks
+const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, "../../../database-pglite");
+
+// Production-safe singleton pattern using globalThis to prevent multiple initializations
+// especially useful if the module is re-loaded or bundled in a way that creates duplicates.
+const globalForPglite = globalThis as unknown as {
+  _pgliteInstance: PGlite | undefined;
+};
+
+function createClient(): PGlite {
+  // Guard against non-main thread initialization (e.g. pino workers)
+  // which can cause lock contention if they don't actually need DB access.
+  if (!isMainThread) {
+    console.warn(`[PGlite] Warning: Initializing PGlite in a worker thread. This may cause lock contention.`);
+  }
+
+  if (globalForPglite._pgliteInstance) {
+    return globalForPglite._pgliteInstance;
+  }
+
+  console.log(`[PGlite] Initializing database at: ${dbPath}`);
+  const instance = new PGlite(dbPath);
+  globalForPglite._pgliteInstance = instance;
+  return instance;
+}
 
 // Initialize PGlite with persistent storage on disk
-export const client = new PGlite(dbPath);
+export const client = createClient();
 export const db = drizzle(client, { schema });
 
 export * from "./schema";
