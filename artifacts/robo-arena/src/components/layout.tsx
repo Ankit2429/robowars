@@ -12,46 +12,29 @@ export default function Layout({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
+  const hideHeader = location === "/" || location === "/portal" || location === "/admin";
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground overflow-x-hidden">
       <div className="scanlines" />
       <div className="crt-flicker" />
       
-      <header className="sticky top-0 z-40 w-full border-b-2 border-primary/20 bg-background/90 backdrop-blur-md">
+      {!hideHeader && (
+        <header className="sticky top-0 z-40 w-full border-b-2 border-primary/20 bg-background/90 backdrop-blur-md">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 group" data-testid="link-home">
-            <Sword className="h-6 w-6 text-primary group-hover:text-secondary transition-colors" />
-            <span className="font-display text-2xl font-bold tracking-widest text-white group-hover:text-primary transition-colors">
-              ROBO<span className="text-primary group-hover:text-white">ARENA</span>
-            </span>
+          <Link href="/" className="flex items-center gap-3 group" data-testid="link-home" style={{ textDecoration: 'none' }}>
+            <Sword className="h-8 w-8 text-red transition-colors" />
+            <div className="flex flex-col justify-center">
+              <span className="hero-title !text-2xl !mb-0 !font-display !font-bold !tracking-widest leading-none">
+                <span className="text-white">ROBO</span><span className="text-red">WARS</span>
+              </span>
+              <span className="hero-subtitle !text-[0.55rem] !mb-0 mt-1 tracking-[4px] leading-none opacity-90">
+                <span className="text-white">FORGE. FIGHT. </span>
+                <span className="text-red">DESTROY.</span>
+              </span>
+            </div>
           </Link>
           
-          <nav className="flex items-center gap-6 font-display text-sm tracking-widest uppercase">
-            <Link 
-              href="/builder" 
-              className={`flex items-center gap-2 hover:text-primary transition-colors ${location === "/builder" ? "text-primary" : "text-muted-foreground"}`}
-              data-testid="link-nav-builder"
-            >
-              <Wrench className="h-4 w-4" />
-              Builder
-            </Link>
-            <Link 
-              href="/play" 
-              className={`flex items-center gap-2 hover:text-primary transition-colors ${location === "/play" ? "text-primary" : "text-muted-foreground"}`}
-              data-testid="link-nav-play"
-            >
-              <Gamepad2 className="h-4 w-4" />
-              Play
-            </Link>
-            <Link 
-              href="/leaderboard" 
-              className={`flex items-center gap-2 hover:text-secondary transition-colors ${location === "/leaderboard" ? "text-secondary" : "text-muted-foreground"}`}
-              data-testid="link-nav-leaderboard"
-            >
-              <Trophy className="h-4 w-4" />
-              Champions
-            </Link>
-          </nav>
 
           {/* Pilot info + points */}
           {session && (
@@ -84,6 +67,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
+      )}
       
       <main className="flex-1 relative z-10">
         {children}

@@ -48,36 +48,37 @@ const Bolt = ({ position, rotation, mat = STEEL_MID }: { position: [number,numbe
 // --- 1. CHASSIS (12)
 // ==========================================
 
-export function TitanChassis({ intensity = 1 }: { intensity?: number }) {
+export function TitanChassis({ intensity = 1, teamColor = "#8B0000" }: { intensity?: number; teamColor?: string }) {
+  // Derive a slightly darker shade for secondary panels
   return (
     <group position={[0, 0.35, 0]}>
-      {/* Main hull - thick forged iron base */}
-      <mesh castShadow receiveShadow><boxGeometry args={[2.5, 0.7, 2.0]} /><meshStandardMaterial {...WORN_IRON} /></mesh>
-      {/* Raised center command plate */}
-      <mesh position={[0, 0.38, 0]} castShadow><boxGeometry args={[1.6, 0.06, 1.4]} /><meshStandardMaterial color="#8a1200" metalness={0.72} roughness={0.35} envMapIntensity={1.4} /></mesh>
-      {/* Side armor skirts - angled outward */}
+      {/* Main hull — team color painted steel */}
+      <mesh castShadow receiveShadow><boxGeometry args={[2.5, 0.7, 2.0]} /><meshStandardMaterial color={teamColor} metalness={0.75} roughness={0.35} envMapIntensity={1.5} /></mesh>
+      {/* Raised center command plate — darker steel */}
+      <mesh position={[0, 0.38, 0]} castShadow><boxGeometry args={[1.6, 0.06, 1.4]} /><meshStandardMaterial color="#0e0e12" metalness={0.92} roughness={0.18} envMapIntensity={1.6} /></mesh>
+      {/* Side armor skirts — slightly lighter team tint */}
       {([-1.3, 1.3] as const).map(x => (
         <group key={`skirt-${x}`}>
           <mesh position={[x, 0.1, 0]} rotation={[0, 0, x > 0 ? 0.18 : -0.18]} castShadow receiveShadow>
-            <boxGeometry args={[0.2, 0.5, 2.1]} /><meshStandardMaterial color="#aa1400" metalness={0.60} roughness={0.42} envMapIntensity={1.3} />
+            <boxGeometry args={[0.2, 0.5, 2.1]} /><meshStandardMaterial color={teamColor} metalness={0.65} roughness={0.40} envMapIntensity={1.3} />
           </mesh>
           {/* Chrome edge banding */}
           <mesh position={[x + (x>0?0.12:-0.12), 0.32, 0]}><boxGeometry args={[0.03, 0.04, 2.1]} /><meshStandardMaterial {...CHROME} /></mesh>
         </group>
       ))}
-      {/* Front ram plate */}
-      <mesh position={[0, 0.15, 1.06]} castShadow><boxGeometry args={[2.5, 0.4, 0.12]} /><meshStandardMaterial color="#dd2200" metalness={0.68} roughness={0.32} envMapIntensity={1.4} /></mesh>
-      {/* Rear engine housing */}
+      {/* Front ram plate — team color */}
+      <mesh position={[0, 0.15, 1.06]} castShadow><boxGeometry args={[2.5, 0.4, 0.12]} /><meshStandardMaterial color={teamColor} metalness={0.72} roughness={0.28} envMapIntensity={1.5} /></mesh>
+      {/* Rear engine housing — dark steel */}
       <mesh position={[0, 0.25, -0.9]} castShadow><boxGeometry args={[1.8, 0.5, 0.3]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
       {/* Exhaust cylinders */}
       {([-0.6, 0, 0.6] as const).map(x => (
         <mesh key={`exh-${x}`} position={[x, 0.55, -0.95]} rotation={[Math.PI/2,0,0]} castShadow>
-          <cylinderGeometry args={[0.07, 0.1, 0.4, 10]} /><meshStandardMaterial color="#cc1a00" metalness={0.72} roughness={0.38} envMapIntensity={1.3} />
+          <cylinderGeometry args={[0.07, 0.1, 0.4, 10]} /><meshStandardMaterial color="#1a1a1a" metalness={0.85} roughness={0.3} envMapIntensity={1.2} />
         </mesh>
       ))}
       {/* Panel groove lines */}
       {[-0.9, -0.3, 0.3, 0.9].map(x => (
-        <mesh key={`groove-${x}`} position={[x, 0.36, 0]}><boxGeometry args={[0.03, 0.02, 2.0]} /><meshStandardMaterial color="#111" roughness={1} metalness={0} /></mesh>
+        <mesh key={`groove-${x}`} position={[x, 0.36, 0]}><boxGeometry args={[0.03, 0.02, 2.0]} /><meshStandardMaterial color="#050508" roughness={1} metalness={0} /></mesh>
       ))}
       {/* Hex bolt clusters */}
       {[-1.1, 1.1].map(x => [-0.7, 0, 0.7].map(z => (
@@ -416,35 +417,53 @@ export function TitanDisc() {
   const spinRef = useRef<THREE.Group>(null!);
   useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * 12; });
   return (
-    <group position={[0, 0.85, 1.25]}>
-      {/* Spinning disc assembly */}
+    // Mounted flush on front of chassis — y=0.65 puts disc centre at chassis top level
+    <group position={[0, 0.65, 1.1]}>
+      {/* Motor housing / mount block */}
+      <mesh position={[0, 0, -0.42]} castShadow>
+        <boxGeometry args={[0.8, 0.38, 0.55]} />
+        <meshStandardMaterial {...STEEL_DARK} />
+      </mesh>
+      {/* Support arms — connect housing to disc axle */}
+      {([-0.32, 0.32] as const).map(x => (
+        <mesh key={`arm-${x}`} position={[x, 0.0, -0.14]} castShadow>
+          <boxGeometry args={[0.1, 0.28, 0.58]} />
+          <meshStandardMaterial {...STEEL_MID} />
+        </mesh>
+      ))}
+      {/* Axle bearing collar */}
+      <mesh castShadow>
+        <cylinderGeometry args={[0.14, 0.14, 0.12, 14]} />
+        <meshStandardMaterial {...CHROME} />
+      </mesh>
+      {/* Spinning disc — 0.78 radius fits inside chassis width */}
       <group ref={spinRef}>
-        {/* Outer flywheel ring */}
-        <mesh castShadow><cylinderGeometry args={[1.05, 1.05, 0.25, 48]} /><meshStandardMaterial color="#aaaaaa" metalness={1.0} roughness={0.05} envMapIntensity={1.6} /></mesh>
-        {/* Mid-ring groove */}
-        <mesh><cylinderGeometry args={[0.88, 0.88, 0.28, 48]} /><meshStandardMaterial color="#555" metalness={0.92} roughness={0.18} /></mesh>
-        {/* Sharpened outer edge - chrome bevel */}
-        <mesh><torusGeometry args={[1.05, 0.03, 8, 48]} /><meshStandardMaterial {...CHROME} /></mesh>
-        {/* Radial cutting teeth - 12 positions */}
-        {Array.from({length:12}).map((_,i) => (
-          <mesh key={i} position={[Math.cos(i*Math.PI/6)*0.98, 0, Math.sin(i*Math.PI/6)*0.98]} rotation={[0,-i*Math.PI/6,0]} castShadow>
-            <boxGeometry args={[0.18, 0.28, 0.12]} /><meshStandardMaterial {...TUNGSTEN} />
+        <mesh castShadow>
+          <cylinderGeometry args={[0.78, 0.78, 0.22, 48]} />
+          <meshStandardMaterial color="#c0c0c0" metalness={1.0} roughness={0.04} envMapIntensity={1.8} />
+        </mesh>
+        {/* Inner groove ring */}
+        <mesh>
+          <cylinderGeometry args={[0.62, 0.62, 0.25, 48]} />
+          <meshStandardMaterial color="#444" metalness={0.92} roughness={0.2} />
+        </mesh>
+        {/* Chrome cutting edge bevel */}
+        <mesh><torusGeometry args={[0.78, 0.028, 8, 48]} /><meshStandardMaterial {...CHROME} /></mesh>
+        {/* 10 tungsten cutting teeth */}
+        {Array.from({length:10}).map((_,i) => (
+          <mesh key={i}
+            position={[Math.cos(i*Math.PI/5)*0.73, 0, Math.sin(i*Math.PI/5)*0.73]}
+            rotation={[0, -i*Math.PI/5, 0]} castShadow>
+            <boxGeometry args={[0.14, 0.24, 0.10]} />
+            <meshStandardMaterial {...TUNGSTEN} />
           </mesh>
         ))}
         {/* Central hub */}
-        <mesh castShadow><cylinderGeometry args={[0.28, 0.28, 0.32, 16]} /><meshStandardMaterial color="#222" metalness={0.95} roughness={0.1} /></mesh>
-        {/* Hub bolts */}
-        {[0,1,2,3,4,5].map(i => (
-          <mesh key={`hbolt-${i}`} position={[Math.cos(i*Math.PI/3)*0.18, 0.17, Math.sin(i*Math.PI/3)*0.18]} rotation={[Math.PI/2,0,0]} castShadow>
-            <cylinderGeometry args={[0.03, 0.03, 0.06, 6]} /><meshStandardMaterial {...CHROME} />
-          </mesh>
-        ))}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.18, 0.18, 0.28, 16]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.96} roughness={0.08} />
+        </mesh>
       </group>
-      {/* Static mounting bracket */}
-      <mesh position={[0, -0.22, -0.6]} castShadow><boxGeometry args={[0.7, 0.32, 0.7]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
-      {([-0.3, 0.3] as const).map(x => (
-        <mesh key={`arm-${x}`} position={[x, -0.1, -0.3]} castShadow><boxGeometry args={[0.12, 0.2, 0.65]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
-      ))}
     </group>
   );
 }
@@ -580,29 +599,31 @@ export function HorizontalSpinner() {
   const spinRef = useRef<THREE.Group>(null!);
   useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * 20; });
   return (
-    <group position={[0, 0.82, 1.0]}>
-      {/* Spinning bar assembly */}
+    <group position={[0, 0.72, 0.95]}>
+      {/* Mount block bolted to chassis front */}
+      <mesh position={[0, -0.26, -0.35]} castShadow>
+        <boxGeometry args={[0.9, 0.38, 0.5]} />
+        <meshStandardMaterial {...STEEL_DARK} />
+      </mesh>
+      {/* Static center hub */}
+      <mesh castShadow><cylinderGeometry args={[0.36, 0.36, 0.38, 18]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
+      <mesh castShadow><cylinderGeometry args={[0.18, 0.18, 0.44, 14]} /><meshStandardMaterial color="#222" metalness={0.95} roughness={0.1} /></mesh>
+      {/* Bearing rings */}
+      {[-0.16, 0.16].map(y => <mesh key={`bearing-${y}`} position={[0,y,0]}><torusGeometry args={[0.36, 0.022, 8, 32]} /><meshStandardMaterial {...CHROME} /></mesh>)}
+      {/* Spinning bar — 2.2 wide, fits chassis */}
       <group ref={spinRef}>
-        {/* Horizontal bar - hardened steel */}
-        <mesh castShadow><boxGeometry args={[3.1, 0.22, 0.28]} /><meshStandardMaterial color="#909090" metalness={0.95} roughness={0.08} envMapIntensity={1.5} /></mesh>
-        {/* Tip impact inserts - tungsten */}
-        {([-1.55, 1.55] as const).map(x => (
+        <mesh castShadow>
+          <boxGeometry args={[2.2, 0.20, 0.26]} />
+          <meshStandardMaterial color="#909090" metalness={0.95} roughness={0.08} envMapIntensity={1.5} />
+        </mesh>
+        {/* Tip tungsten inserts */}
+        {([-1.1, 1.1] as const).map(x => (
           <group key={`tip-${x}`} position={[x, 0, 0]}>
-            <mesh castShadow><boxGeometry args={[0.12, 0.25, 0.32]} /><meshStandardMaterial {...TUNGSTEN} /></mesh>
-            {/* Chrome leading bevel */}
-            <mesh position={[x>0?0.06:-0.06, 0, 0]}><boxGeometry args={[0.04, 0.24, 0.3]} /><meshStandardMaterial {...CHROME} /></mesh>
+            <mesh castShadow><boxGeometry args={[0.10, 0.24, 0.30]} /><meshStandardMaterial {...TUNGSTEN} /></mesh>
+            <mesh position={[x>0?0.05:-0.05, 0, 0]}><boxGeometry args={[0.04, 0.22, 0.28]} /><meshStandardMaterial {...CHROME} /></mesh>
           </group>
         ))}
-        {/* Panel lines on bar */}
-        {[-0.5, 0.5].map(x => <mesh key={`pl-${x}`} position={[x, 0.12, 0]}><boxGeometry args={[0.02, 0.01, 0.28]} /><meshStandardMaterial color="#111" roughness={1} /></mesh>)}
       </group>
-      {/* Static center hub & mount */}
-      <mesh castShadow><cylinderGeometry args={[0.42, 0.42, 0.42, 18]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
-      <mesh castShadow><cylinderGeometry args={[0.22, 0.22, 0.48, 14]} /><meshStandardMaterial color="#222" metalness={0.95} roughness={0.1} /></mesh>
-      {/* Bearing rings */}
-      {[-0.18, 0.18].map(y => <mesh key={`bearing-${y}`} position={[0,y,0]}><torusGeometry args={[0.42, 0.025, 8, 32]} /><meshStandardMaterial {...CHROME} /></mesh>)}
-      {/* Mounting strut */}
-      <mesh position={[0, -0.38, -0.3]} castShadow><cylinderGeometry args={[0.14, 0.14, 0.5, 10]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
     </group>
   );
 }
@@ -634,36 +655,42 @@ export function DrumSpinner() {
   const spinRef = useRef<THREE.Group>(null!);
   useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.x += delta * 22; });
   return (
-    <group position={[0, 0.62, 1.15]}>
-      {/* Spinning drum */}
+    // Drum sits in front of chassis — rotates on horizontal axis
+    <group position={[0, 0.52, 1.05]}>
+      {/* U-bracket frame — connects drum axle to chassis */}
+      {([-0.7, 0.7] as const).map(x => (
+        <mesh key={`bracket-${x}`} position={[x, -0.08, -0.38]} castShadow>
+          <boxGeometry args={[0.16, 0.48, 0.62]} />
+          <meshStandardMaterial {...STEEL_DARK} />
+        </mesh>
+      ))}
+      <mesh position={[0, -0.28, -0.38]} castShadow>
+        <boxGeometry args={[1.55, 0.14, 0.62]} />
+        <meshStandardMaterial {...STEEL_MID} />
+      </mesh>
+      {/* Spinning drum — radius 0.44 clears floor when group y=0.52 */}
       <group ref={spinRef}>
-        {/* Main drum cylinder - heavy */}
-        <mesh castShadow><cylinderGeometry args={[0.62, 0.62, 1.9, 32]} /><meshStandardMaterial color="#666" metalness={0.88} roughness={0.2} /></mesh>
-        {/* 8 blunt impact bars around circumference */}
-        {Array.from({length:8}).map((_,i) => (
-          <mesh key={i} position={[Math.cos(i*Math.PI/4)*0.62, 0, Math.sin(i*Math.PI/4)*0.62]} rotation={[0,i*Math.PI/4,0]} castShadow>
-            <boxGeometry args={[0.15, 1.9, 0.18]} /><meshStandardMaterial color="#333" metalness={0.92} roughness={0.14} />
+        <mesh castShadow>
+          <cylinderGeometry args={[0.44, 0.44, 1.55, 32]} />
+          <meshStandardMaterial color="#686868" metalness={0.88} roughness={0.2} />
+        </mesh>
+        {/* 6 impact bars */}
+        {Array.from({length:6}).map((_,i) => (
+          <mesh key={i}
+            position={[Math.cos(i*Math.PI/3)*0.44, 0, Math.sin(i*Math.PI/3)*0.44]}
+            rotation={[0, i*Math.PI/3, 0]} castShadow>
+            <boxGeometry args={[0.12, 1.55, 0.14]} />
+            <meshStandardMaterial color="#282828" metalness={0.92} roughness={0.14} />
           </mesh>
         ))}
-        {/* Circular end caps with hub */}
-        {([-0.97, 0.97] as const).map(y => (
+        {/* End caps */}
+        {([-0.79, 0.79] as const).map(y => (
           <group key={`cap-${y}`} position={[0,y,0]}>
-            <mesh castShadow><cylinderGeometry args={[0.64, 0.64, 0.08, 32]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
-            <mesh castShadow><cylinderGeometry args={[0.22, 0.22, 0.12, 16]} /><meshStandardMaterial {...CHROME} /></mesh>
-            {/* Cap bolts */}
-            {[0,1,2,3,4].map(b => (
-              <mesh key={`capbolt-${b}`} position={[Math.cos(b*Math.PI*2/5)*0.48, y>0?0.06:-0.06, Math.sin(b*Math.PI*2/5)*0.48]} rotation={[Math.PI/2,0,0]} castShadow>
-                <cylinderGeometry args={[0.035, 0.035, 0.06, 6]} /><meshStandardMaterial {...STEEL_MID} />
-              </mesh>
-            ))}
+            <mesh castShadow><cylinderGeometry args={[0.46, 0.46, 0.07, 24]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
+            <mesh castShadow><cylinderGeometry args={[0.16, 0.16, 0.10, 14]} /><meshStandardMaterial {...CHROME} /></mesh>
           </group>
         ))}
       </group>
-      {/* Drum frame brackets - U-shaped mounting */}
-      {([-0.85, 0.85] as const).map(x => (
-        <mesh key={`bracket-${x}`} position={[x, -0.28, -0.5]} castShadow><boxGeometry args={[0.18, 0.55, 0.75]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
-      ))}
-      <mesh position={[0, -0.55, -0.5]} castShadow><boxGeometry args={[1.85, 0.16, 0.75]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
     </group>
   );
 }
@@ -1199,7 +1226,9 @@ export function HighFidelityRobotMesh({
   bodyPart, attackPart, defensePart, secondaryPart, 
   isForging = false,
   isHit = false,
-  isAttacking = false 
+  isAttacking = false,
+  teamColor = "#8B0000",
+  velRef,
 }: { 
   bodyPart?: any, 
   attackPart?: any, 
@@ -1207,17 +1236,34 @@ export function HighFidelityRobotMesh({
   secondaryPart?: any,
   isForging?: boolean,
   isHit?: boolean,
-  isAttacking?: boolean
+  isAttacking?: boolean,
+  teamColor?: string,
+  velRef?: React.MutableRefObject<{ x: number; z: number }>,
 }) {
   const bName = (bodyPart?.id || bodyPart?.name || "").toLowerCase();
   const aName = (attackPart?.id || attackPart?.name || "").toLowerCase();
   const dName = (defensePart?.id || defensePart?.name || "").toLowerCase();
   const sName = (secondaryPart?.id || secondaryPart?.name || "").toLowerCase();
 
-  const emissiveRef = useRef<number>(1.0);
-  const groupRef = useRef<THREE.Group>(null!);
+  const emissiveRef    = useRef<number>(1.0);
+  const groupRef       = useRef<THREE.Group>(null!);
+  // 4 wheel spin groups — [FL, FR, RL, RR]
+  const wheelSpinRefs  = useRef<(THREE.Group | null)[]>([null, null, null, null]);
+  const WHEEL_RADIUS   = 0.35; // must match cylinderGeometry radius
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
+    // ── Wheel rolling — spin speed from velocity magnitude
+    if (velRef) {
+      const vx = velRef.current.x;
+      const vz = velRef.current.z;
+      const speed = Math.sqrt(vx * vx + vz * vz);
+      // radians per second = linear_speed / wheel_radius
+      const rollDelta = (speed / WHEEL_RADIUS) * delta;
+      wheelSpinRefs.current.forEach(ref => {
+        if (ref) ref.rotation.y += rollDelta;
+      });
+    }
+    // ── Hit shudder + emissive
     if (isHit) {
       emissiveRef.current = 5.0;
       if (groupRef.current) {
@@ -1298,41 +1344,106 @@ export function HighFidelityRobotMesh({
   return (
     <group ref={groupRef}>
       {isHit && (
-        <mesh scale={1.1}>
-          <boxGeometry args={[3, 2, 4]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.4} />
-        </mesh>
+        <>
+          <mesh scale={1.06}>
+            <boxGeometry args={[3, 2, 4]} />
+            <meshStandardMaterial
+              color="#ff1100"
+              emissive="#ff1100"
+              emissiveIntensity={3.5}
+              metalness={0.8}
+              roughness={0.2}
+              transparent
+              opacity={0.22}
+              side={2}
+            />
+          </mesh>
+          {/* Inner bright core */}
+          <mesh scale={0.96}>
+            <boxGeometry args={[3, 2, 4]} />
+            <meshStandardMaterial
+              color="#ff6600"
+              emissive="#ff4400"
+              emissiveIntensity={2.0}
+              metalness={1.0}
+              roughness={0.1}
+              transparent
+              opacity={0.15}
+              side={2}
+            />
+          </mesh>
+        </>
       )}
-      <BodyComp intensity={emissiveRef.current} />
+      <BodyComp intensity={emissiveRef.current} teamColor={teamColor} />
       <AttackComp intensity={emissiveRef.current} />
       <DefenseComp intensity={emissiveRef.current} />
       {SecondaryComp && <SecondaryComp intensity={emissiveRef.current} />}
 
-      {/* Wheels */}
-      {([[-1.3, 1.0], [1.3, 1.0], [-1.3, -1.0], [1.3, -1.0]] as const).map(([x, z], i) => (
-        <group key={i} position={[x, 0.3, z]} rotation={[0, 0, Math.PI / 2]}>
-          <mesh castShadow receiveShadow>
-            <cylinderGeometry args={[0.4, 0.4, 0.22, 32]} />
-            <meshStandardMaterial {...RUBBER} />
-          </mesh>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.2, 0.2, 0.24, 16]} />
-            <meshStandardMaterial {...CHROME} />
-          </mesh>
-          {[0, 1, 2, 3, 4].map(b => (
-            <mesh key={`bolt-f-${b}`} position={[Math.cos(b * Math.PI * 2 / 5) * 0.12, 0.125, Math.sin(b * Math.PI * 2 / 5) * 0.12]} castShadow>
-              <cylinderGeometry args={[0.025, 0.025, 0.05, 6]} />
+      {/* ── WHEELS: 4 wheels with driven spin groups
+           Outer group = position + tilt (rotation [0,0,PI/2])
+           Inner spinGroup = rolls via rotation.y in useFrame ── */}
+      {([[-1.55, 0.9], [1.55, 0.9], [-1.55, -0.9], [1.55, -0.9]] as const).map(([x, z], i) => {
+        const side = x > 0 ? 1 : -1;
+        return (
+          <group key={i}>
+            {/* Axle stub — static */}
+            <mesh position={[x - side * 0.12, 0.35, z]} rotation={[0, 0, Math.PI / 2]} castShadow>
+              <cylinderGeometry args={[0.055, 0.055, 0.28, 10]} />
               <meshStandardMaterial {...CHROME} />
             </mesh>
-          ))}
-          {[0, 1, 2, 3, 4].map(b => (
-            <mesh key={`bolt-b-${b}`} position={[Math.cos(b * Math.PI * 2 / 5) * 0.12, -0.125, Math.sin(b * Math.PI * 2 / 5) * 0.12]} castShadow>
-              <cylinderGeometry args={[0.025, 0.025, 0.05, 6]} />
-              <meshStandardMaterial {...CHROME} />
+            {/* Axle mount plate — static */}
+            <mesh position={[x - side * 0.24, 0.35, z]} castShadow>
+              <boxGeometry args={[0.06, 0.28, 0.22]} />
+              <meshStandardMaterial {...STEEL_DARK} />
             </mesh>
-          ))}
-        </group>
-      ))}
+            {/* Wheel outer group — sets position + tilts cylinder to lie along X */}
+            <group position={[x, 0.35, z]} rotation={[0, 0, Math.PI / 2]}>
+              {/* Static tyre sidewall bead (doesn't spin, stays as reference ring) */}
+              <mesh>
+                <torusGeometry args={[0.33, 0.022, 8, 40]} />
+                <meshStandardMaterial color="#1a1a1c" metalness={0.2} roughness={0.75} />
+              </mesh>
+              {/* ── SPIN GROUP: this rotates around local Y = world left-right axle */}
+              <group ref={el => { wheelSpinRefs.current[i] = el; }}>
+                {/* Tyre */}
+                <mesh castShadow receiveShadow>
+                  <cylinderGeometry args={[0.35, 0.35, 0.26, 40]} />
+                  <meshStandardMaterial color="#0c0c0e" metalness={0.04} roughness={0.92} envMapIntensity={0.3} />
+                </mesh>
+                {/* Hub */}
+                <mesh castShadow>
+                  <cylinderGeometry args={[0.18, 0.18, 0.28, 20]} />
+                  <meshStandardMaterial color="#3a3c42" metalness={0.95} roughness={0.12} envMapIntensity={2.0} />
+                </mesh>
+                {/* Chrome hub cap */}
+                <mesh position={[0, side * 0.14, 0]}>
+                  <cylinderGeometry args={[0.09, 0.09, 0.02, 16]} />
+                  <meshStandardMaterial {...CHROME} envMapIntensity={2.4} />
+                </mesh>
+                {/* 5 lug bolts (outer face) */}
+                {[0,1,2,3,4].map(b => {
+                  const a = b * Math.PI * 2 / 5;
+                  return (
+                    <mesh key={b} position={[Math.cos(a)*0.12, side * 0.14, Math.sin(a)*0.12]} castShadow>
+                      <cylinderGeometry args={[0.02, 0.02, 0.04, 6]} />
+                      <meshStandardMaterial color="#999" metalness={0.98} roughness={0.08} />
+                    </mesh>
+                  );
+                })}
+                {/* 4 spokes — rotate with wheel for visible spin */}
+                {[0,1,2,3].map(b => (
+                  <mesh key={`spoke-${b}`}
+                    position={[Math.cos(b*Math.PI/2)*0.13, 0, Math.sin(b*Math.PI/2)*0.13]}
+                    rotation={[0, 0, b*Math.PI/2]}>
+                    <boxGeometry args={[0.26, 0.025, 0.038]} />
+                    <meshStandardMaterial color="#2a2c32" metalness={0.92} roughness={0.18} />
+                  </mesh>
+                ))}
+              </group>
+            </group>
+          </group>
+        );
+      })}
     </group>
   );
 }

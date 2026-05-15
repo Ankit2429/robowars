@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X } from "lucide-react";
-import { io, Socket } from "socket.io-client";
+import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock } from "lucide-react";
+import { useMockDB } from "./portal";
 
 interface StoredRobot {
   playerName: string;
@@ -16,10 +16,10 @@ interface StoredRobot {
 export default function Play() {
   const [, setLocation] = useLocation();
   const [myRobot, setMyRobot] = useState<StoredRobot | null>(null);
-  const [searching, setSearching] = useState(false);
+  const { loadDB } = useMockDB();
+  const [matchState, setMatchState] = useState<"idle" | "awaiting_admin" | "searching" | "found">("idle");
   const [searchTime, setSearchTime] = useState(0);
   const [found, setFound] = useState<{ opponentName: string; roomId: string } | null>(null);
-  const socketRef = useRef<Socket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -27,57 +27,46 @@ export default function Play() {
     if (saved) setMyRobot(JSON.parse(saved));
   }, []);
 
-  // Search timer
   useEffect(() => {
-    if (searching) {
+    if (matchState === "searching") {
       timerRef.current = setInterval(() => setSearchTime(t => t + 1), 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
       setSearchTime(0);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [searching]);
+  }, [matchState]);
+
+  useEffect(() => {
+    if (matchState === "awaiting_admin") {
+      const interval = setInterval(() => {
+        const db = loadDB();
+        if (db.matchmakingActive) {
+          clearInterval(interval);
+          setMatchState("searching");
+        }
+      }, 2000);
+      return () => clearInterval(interval);
+    } else if (matchState === "searching") {
+      const timeout = setTimeout(() => {
+        setFound({ opponentName: "XENON_GHOST (CPU)", roomId: "ai" });
+        setMatchState("found");
+        setTimeout(() => {
+          setLocation("/battle/ai");
+        }, 3000);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [matchState]);
 
   const handleFindMatch = () => {
     if (!myRobot) return;
-    setSearching(true);
-
-    const socket = io(import.meta.env.BASE_URL.replace(/\/$/, ""), {
-      path: `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/socket.io`,
-      transports: ["websocket", "polling"],
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      socket.emit("findMatch", { playerName: myRobot.playerName, robotId: null });
-    });
-
-    socket.on("matchFound", ({ roomId, opponentName }: { roomId: string; opponentName: string }) => {
-      setFound({ roomId, opponentName });
-      setSearching(false);
-
-      setTimeout(() => {
-        socket.disconnect();
-        setLocation(`/battle/${roomId}`);
-      }, 2000);
-    });
-
-    socket.on("matchSearching", () => {
-      // Still waiting, keep spinner
-    });
-
-    socket.on("connect_error", () => {
-      setSearching(false);
-      socket.disconnect();
-    });
+    setMatchState("awaiting_admin");
   };
 
   const handleCancel = () => {
-    socketRef.current?.emit("cancelMatch");
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-    setSearching(false);
+    setMatchState("idle");
+    setFound(null);
   };
 
   const handleAITraining = () => {
@@ -140,7 +129,7 @@ export default function Play() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleFindMatch}
-            disabled={!myRobot || searching || !!found}
+            disabled={!myRobot || matchState !== "idle"}
             className="brutal-border bg-primary/10 border-primary p-8 flex flex-col items-center gap-4 hover:bg-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
           >
             <div className="w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center shadow-[0_0_20px_rgba(255,69,0,0.4)] group-hover:shadow-[0_0_30px_rgba(255,69,0,0.7)] transition-all">
@@ -171,9 +160,8 @@ export default function Play() {
         </div>
       </motion.div>
 
-      {/* Searching overlay */}
       <AnimatePresence>
-        {(searching || found) && (
+        {matchState !== "idle" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -181,7 +169,7 @@ export default function Play() {
             className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center"
           >
             <div className="brutal-border bg-card p-12 flex flex-col items-center gap-6 min-w-[320px]">
-              {found ? (
+              {matchState === "found" && found ? (
                 <>
                   <Swords className="h-16 w-16 text-primary animate-pulse" />
                   <div className="text-center">
@@ -189,6 +177,19 @@ export default function Play() {
                     <p className="font-display text-3xl text-white font-bold">{found.opponentName}</p>
                   </div>
                   <p className="font-mono text-primary text-sm animate-pulse">ENTERING ARENA...</p>
+                </>
+              ) : matchState === "awaiting_admin" ? (
+                <>
+                  <div className="relative mb-2">
+                    <Lock className="h-12 w-12 text-muted-foreground opacity-50" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display text-2xl text-white font-bold tracking-widest uppercase">AWAITING ADMIN</p>
+                  </div>
+                  <p className="font-mono text-xs text-muted-foreground text-center">Matchmaking is currently locked.<br/>Please wait for the tournament to begin...</p>
+                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2 mt-4">
+                    <X className="h-4 w-4" /> CANCEL
+                  </button>
                 </>
               ) : (
                 <>
@@ -203,7 +204,7 @@ export default function Play() {
                     </p>
                   </div>
                   <p className="font-mono text-xs text-muted-foreground text-center">Waiting for an opponent...</p>
-                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2">
+                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2 mt-2">
                     <X className="h-4 w-4" /> CANCEL
                   </button>
                 </>
