@@ -77,7 +77,7 @@ if (frontendDist) {
   logger.info({ path: frontendDist }, "Serving frontend static files");
   app.use(express.static(frontendDist));
   // SPA fallback: serve index.html for any non-API route
-  app.get("*", (req, res) => {
+  app.get("/*path", (req, res) => {
     res.sendFile(path.join(frontendDist!, "index.html"));
   });
 } else {
