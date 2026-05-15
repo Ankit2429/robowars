@@ -49,13 +49,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SessionProvider>
-          <LoginGate>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <LoginGate>
               <Layout>
                 <Router />
               </Layout>
-            </WouterRouter>
-          </LoginGate>
+            </LoginGate>
+          </WouterRouter>
         </SessionProvider>
         <Toaster />
       </TooltipProvider>

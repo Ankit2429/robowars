@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock } from "lucide-react";
+import { customFetch } from "@workspace/api-client-react";
 import { useMockDB } from "./portal";
 
 interface StoredRobot {
@@ -39,13 +40,17 @@ export default function Play() {
 
   useEffect(() => {
     if (matchState === "awaiting_admin") {
-      const interval = setInterval(() => {
-        const db = loadDB();
-        if (db.matchmakingActive) {
-          clearInterval(interval);
-          setMatchState("searching");
+      const interval = setInterval(async () => {
+        try {
+          const settings = await customFetch<any>("/api/settings");
+          if (settings.matchmakingActive) {
+            clearInterval(interval);
+            setMatchState("searching");
+          }
+        } catch (err) {
+          console.error("[Play] Failed to check matchmaking status:", err);
         }
-      }, 2000);
+      }, 3000);
       return () => clearInterval(interval);
     } else if (matchState === "searching") {
       const timeout = setTimeout(() => {

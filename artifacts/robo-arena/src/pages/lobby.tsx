@@ -29,6 +29,10 @@ export default function Lobby() {
           setIsDialogOpen(false);
           queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
           setLocation(`/battle/${newRoom.id}`);
+        },
+        onError: (err) => {
+          console.error("[Lobby] Failed to create room:", err);
+          // Optionally show a toast or alert if available
         }
       }
     );

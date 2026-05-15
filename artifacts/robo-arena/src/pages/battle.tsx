@@ -692,7 +692,10 @@ export default function Battle() {
   // Multiplayer socket
   useEffect(() => {
     if (isAI) return;
-    const apiUrl = import.meta.env.VITE_API_URL || undefined;
+    let apiUrl = import.meta.env.VITE_API_URL || undefined;
+    if (apiUrl && !apiUrl.startsWith("http") && apiUrl.includes(".")) {
+      apiUrl = `https://${apiUrl}`;
+    }
     const socket = io(apiUrl, {
       path: "/api/socket.io",
       transports: ["websocket", "polling"],

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/context/SessionContext";
+import { useToast } from "@/hooks/use-toast";
 
 function RealisticEnvironment() {
   const { gl, scene } = useThree();
@@ -62,6 +63,7 @@ function StatBar({ icon: Icon, label, value, barColor }: { icon: any; label: str
 }
 
 export default function Builder() {
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const webGLSupported = useWebGLSupported();
@@ -152,7 +154,15 @@ export default function Builder() {
           queryClient.invalidateQueries({ queryKey: ["/api/robots"] });
           localStorage.setItem("roboArena_robot", JSON.stringify({ ...robotData, robotId: newRobot.id }));
         },
-        onError: () => {},
+        onError: (err) => {
+          console.error("[Builder] Failed to save robot to backend:", err);
+          toast({
+            title: "Cloud Sync Failed",
+            description: "Your robot was saved locally but could not be synced to the database. Results may not be recorded.",
+            variant: "destructive",
+          });
+          setForgeError("Network Error: Could not save robot to cloud. Please check your connection.");
+        },
       }
     );
 

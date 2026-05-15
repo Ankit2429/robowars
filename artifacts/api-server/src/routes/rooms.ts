@@ -40,10 +40,11 @@ router.post("/rooms", async (req, res): Promise<void> => {
       maxPlayers: 2,
     }).returning();
 
+    req.log.info({ roomId: room.id, name, hostName }, "Battle room created successfully in database");
     res.status(201).json({ ...room, createdAt: room.createdAt.toISOString() });
-  } catch (err) {
-    req.log.error({ err }, "Failed to create room");
-    res.status(500).json({ error: "Failed to create room" });
+  } catch (err: any) {
+    req.log.error({ err: err.message, stack: err.stack, body: req.body }, "Failed to create room in database");
+    res.status(500).json({ error: "Failed to create room", message: err.message });
   }
 });
 

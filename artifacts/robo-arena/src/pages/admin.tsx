@@ -1,24 +1,46 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useMockDB } from "./portal";
+import { customFetch } from "@workspace/api-client-react";
 
 export default function Admin() {
-  const { loadDB, saveDB } = useMockDB();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authKey, setAuthKey] = useState("");
   const [authMsg, setAuthMsg] = useState("");
   
   const [activeTab, setActiveTab] = useState<"roster" | "bracket" | "codes">("roster");
   
-  const [db, setDb] = useState(loadDB());
+  const [players, setPlayers] = useState<any[]>([]);
+  const [matchmakingActive, setMatchmakingActive] = useState(false);
+  const [codes, setCodes] = useState<string[]>([]);
   const [newCode, setNewCode] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     document.body.classList.add('cyber-landing');
+    if (isAuthenticated) {
+      refreshData();
+    }
     return () => {
       document.body.classList.remove('cyber-landing');
     };
-  }, []);
+  }, [isAuthenticated]);
+
+  const refreshData = async () => {
+    setIsLoading(true);
+    try {
+      const [settingsRes, playersRes] = await Promise.all([
+        customFetch<any>("/api/settings"),
+        customFetch<any[]>("/api/players")
+      ]);
+      setMatchmakingActive(settingsRes.matchmakingActive);
+      setCodes(settingsRes.codes);
+      setPlayers(playersRes);
+    } catch (err) {
+      console.error("[Admin] Failed to refresh data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,28 +52,45 @@ export default function Admin() {
     }
   };
 
-  const syncDB = (newDb: any) => {
-    saveDB(newDb);
-    setDb(newDb);
-  };
-
-  const handleAddCode = (e: React.FormEvent) => {
+  const handleAddCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newCode && !db.codes.includes(newCode)) {
-      const updated = { ...db, codes: [...db.codes, newCode] };
-      syncDB(updated);
-      setNewCode("");
+    if (newCode && !codes.includes(newCode)) {
+      try {
+        await customFetch("/api/settings/codes", {
+          method: "POST",
+          body: JSON.stringify({ code: newCode, action: "add" })
+        });
+        setCodes([...codes, newCode]);
+        setNewCode("");
+      } catch (err) {
+        console.error("[Admin] Failed to add code:", err);
+      }
     }
   };
 
-  const handleDeleteCode = (codeToRemove: string) => {
-    const updated = { ...db, codes: db.codes.filter((c: string) => c !== codeToRemove) };
-    syncDB(updated);
+  const handleDeleteCode = async (codeToRemove: string) => {
+    try {
+      await customFetch("/api/settings/codes", {
+        method: "POST",
+        body: JSON.stringify({ code: codeToRemove, action: "remove" })
+      });
+      setCodes(codes.filter((c: string) => c !== codeToRemove));
+    } catch (err) {
+      console.error("[Admin] Failed to remove code:", err);
+    }
   };
 
-  const toggleMatchmaking = () => {
-    const updated = { ...db, matchmakingActive: !db.matchmakingActive };
-    syncDB(updated);
+  const toggleMatchmaking = async () => {
+    const newState = !matchmakingActive;
+    try {
+      await customFetch("/api/settings/matchmaking", {
+        method: "POST",
+        body: JSON.stringify({ active: newState })
+      });
+      setMatchmakingActive(newState);
+    } catch (err) {
+      console.error("[Admin] Failed to toggle matchmaking:", err);
+    }
   };
 
   if (!isAuthenticated) {
@@ -111,7 +150,12 @@ export default function Admin() {
         <div className="admin-content glass-panel">
           {activeTab === "roster" && (
             <div>
-              <h2>Registered Players</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2>Registered Players</h2>
+                <button onClick={refreshData} className="btn" style={{ width: 'auto', fontSize: '0.8rem' }}>
+                  {isLoading ? 'SYNCING...' : 'REFRESH LIST'}
+                </button>
+              </div>
               <div className="table-container">
                 <table>
                   <thead>
@@ -123,7 +167,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {db.players.map((p: any) => (
+                    {players.map((p: any) => (
                       <tr key={p.id}>
                         <td>{p.name}</td>
                         <td>{p.usn}</td>
@@ -131,7 +175,7 @@ export default function Admin() {
                         <td><span style={{ background: 'var(--primary-dim)', color: 'var(--primary-color)', padding: '4px 8px', borderRadius: '4px' }}>{p.status}</span></td>
                       </tr>
                     ))}
-                    {db.players.length === 0 && (
+                    {players.length === 0 && (
                       <tr><td colSpan={4} style={{ textAlign: 'center', color: '#666' }}>No players registered yet.</td></tr>
                     )}
                   </tbody>
@@ -146,11 +190,11 @@ export default function Admin() {
                 <h2>Tournament & Matchmaking</h2>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button 
-                    className={`btn ${db.matchmakingActive ? '' : 'primary-btn'}`} 
-                    style={db.matchmakingActive ? { backgroundColor: '#e74c3c', color: 'white' } : {}}
+                    className={`btn ${matchmakingActive ? '' : 'primary-btn'}`} 
+                    style={matchmakingActive ? { backgroundColor: '#e74c3c', color: 'white' } : {}}
                     onClick={toggleMatchmaking}
                   >
-                    {db.matchmakingActive ? 'STOP MATCHMAKING' : 'START MATCHMAKING'}
+                    {matchmakingActive ? 'STOP MATCHMAKING' : 'START MATCHMAKING'}
                   </button>
                 </div>
               </div>
@@ -169,7 +213,7 @@ export default function Admin() {
                 <button type="submit" className="btn primary-btn" style={{ width: 'auto' }}>Add Code</button>
               </form>
               <div className="codes-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {db.codes.map((c: string) => (
+                {codes.map((c: string) => (
                   <div key={c} className="code-item" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary-dim)', padding: '1rem', borderRadius: '6px', display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ background: 'var(--primary-color)', color: 'var(--bg-color)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>{c}</span>
                     <button onClick={() => handleDeleteCode(c)} style={{ background: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Remove</button>

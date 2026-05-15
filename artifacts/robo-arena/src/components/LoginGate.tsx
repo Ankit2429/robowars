@@ -3,12 +3,20 @@ import { motion } from "framer-motion";
 import { Sword, Zap, AlertTriangle } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { STARTING_POINTS } from "@/lib/session";
+import { useLocation } from "wouter";
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isEliminated, login, logout, session } = useSession();
+  const [location] = useLocation();
   const [username, setUsername] = useState("");
   const [error, setError]       = useState("");
   const [shake, setShake]       = useState(false);
+
+  // Bypass for public routes
+  const publicRoutes = ["/", "/portal", "/admin"];
+  if (publicRoutes.includes(location)) {
+    return <>{children}</>;
+  }
 
   if (isLoggedIn && isEliminated) {
     return (

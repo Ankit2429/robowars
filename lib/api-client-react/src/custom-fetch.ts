@@ -361,9 +361,14 @@ export async function customFetch<T = unknown>(
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });
-
+  
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
+    console.error(`[API Error] ${method} ${requestInfo.url} returned ${response.status}`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: errorData
+    });
     throw new ApiError(response, errorData, requestInfo);
   }
 

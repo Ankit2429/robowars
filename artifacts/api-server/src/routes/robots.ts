@@ -99,10 +99,11 @@ router.post("/robots", async (req, res): Promise<void> => {
       specialAbility,
     }).returning();
 
+    req.log.info({ robotId: robot.id, playerName, name }, "Robot created successfully in database");
     res.status(201).json({ ...robot, createdAt: robot.createdAt.toISOString() });
-  } catch (err) {
-    req.log.error({ err }, "Failed to create robot");
-    res.status(500).json({ error: "Failed to create robot" });
+  } catch (err: any) {
+    req.log.error({ err: err.message, stack: err.stack, body: req.body }, "Failed to create robot in database");
+    res.status(500).json({ error: "Failed to create robot", message: err.message });
   }
 });
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { customFetch } from "@workspace/api-client-react";
 
 // Shared Mock DB logic to replicate app.js behavior
 export function useMockDB() {
@@ -30,31 +31,27 @@ export default function Portal() {
     };
   }, []);
 
-  const handleRegistration = (e: React.FormEvent) => {
+  const handleRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
-    const db = loadDB();
     
-    if (!db.codes.includes(code)) {
-      setMessage({ text: "Invalid Access Code. Please contact Admin.", type: "error" });
-      return;
+    try {
+      const response = await customFetch<any>("/api/players/register", {
+        method: "POST",
+        body: JSON.stringify({ name, usn, branch, code }),
+      });
+      
+      console.log("[Portal] Registration successful:", response);
+      setMessage({ text: "Registration Successful! System Access Granted.", type: "success" });
+      setTimeout(() => {
+        setLocation("/play");
+      }, 1500);
+    } catch (err: any) {
+      console.error("[Portal] Registration failed:", err);
+      setMessage({ 
+        text: err.data?.error || "Registration failed. Please check your connection or access code.", 
+        type: "error" 
+      });
     }
-    
-    if (db.players.find((p: any) => p.usn === usn)) {
-      setMessage({ text: "This USN is already registered in the system.", type: "error" });
-      return;
-    }
-    
-    const newPlayer = {
-      id: Math.random().toString(36).substr(2, 9),
-      name, usn, branch, code, status: 'Registered'
-    };
-    db.players.push(newPlayer);
-    saveDB(db);
-    
-    setMessage({ text: "Registration Successful! System Access Granted.", type: "success" });
-    setTimeout(() => {
-      setLocation("/play");
-    }, 1500);
   };
 
   return (
