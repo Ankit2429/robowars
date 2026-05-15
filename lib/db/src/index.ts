@@ -38,43 +38,83 @@ const globalForPglite = globalThis as unknown as {
 
 function createClient(): PGlite {
   if (!isMainThread) {
-    console.warn(`[PGlite] Warning: Initializing PGlite in a worker thread.`);
+    console.warn(`[PGlite] Warning: Initializing PGlite in a worker thread. This is not recommended for production.`);
   }
 
   if (globalForPglite._pgliteInstance) {
     return globalForPglite._pgliteInstance;
   }
 
+  // Normalize path to absolute
+  const resolvedPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
+
   try {
-    console.log(`[PGlite] Attempting to initialize database at: ${dbPath}`);
-    const instance = new PGlite(dbPath);
+    console.log(`[PGlite] STARTUP: Attempting initialization`);
+    console.log(`[PGlite] PATH: ${resolvedPath}`);
+    console.log(`[PGlite] CWD: ${process.cwd()}`);
+    console.log(`[PGlite] ENV: ${process.env.NODE_ENV}`);
+
+    // Verify directory writability for the actual dbPath, not just parent
+    if (resolvedPath !== "memory") {
+       try {
+         if (!fs.existsSync(resolvedPath)) {
+           console.log(`[PGlite] Creating data directory: ${resolvedPath}`);
+           fs.mkdirSync(resolvedPath, { recursive: true });
+         }
+         const testFile = path.join(resolvedPath, ".lock-test");
+         fs.writeFileSync(testFile, Date.now().toString());
+         fs.unlinkSync(testFile);
+       } catch (err: any) {
+         console.error(`[PGlite] DISK ERROR: Cannot write to ${resolvedPath}. Falling back to memory. Error: ${err.message}`);
+         // Fallback to memory if disk is not writable
+         const memoryInstance = new PGlite();
+         globalForPglite._pgliteInstance = memoryInstance;
+         globalForPglite._pgliteReady = (async () => {
+           if (memoryInstance.waitReady) await memoryInstance.waitReady;
+           console.log(`[PGlite] IN-MEMORY FALLBACK READY (Data will not persist)`);
+         })();
+         return memoryInstance;
+       }
+    }
+
+    // Initialize with relaxed durability to help with container filesystem locks/latency
+    const instance = new PGlite(resolvedPath, {
+      relaxedDurability: true,
+    });
+    
     globalForPglite._pgliteInstance = instance;
 
-    // PGlite constructor is async — store the readiness promise
-    // The instance itself implements PromiseLike, so we can await it
     globalForPglite._pgliteReady = (async () => {
       try {
-        // PGlite v0.2.x: the instance is a PromiseLike that resolves when ready
-        if (instance.waitReady) {
-          await instance.waitReady;
-        } else {
-          // Fallback: await the instance itself (it implements PromiseLike)
-          await (instance as any);
-        }
-        console.log(`[PGlite] Database READY and accepting queries`);
+        console.log(`[PGlite] Awaiting readiness...`);
+        // Use a timeout for the readiness check to prevent infinite hanging
+        const readyPromise = instance.waitReady || (instance as any);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("PGlite readiness TIMEOUT after 15s")), 15000)
+        );
+
+        await Promise.race([readyPromise, timeoutPromise]);
+        console.log(`[PGlite] Database READY at ${resolvedPath}`);
       } catch (err: any) {
-        console.error(`[PGlite] waitReady FAILED: ${err.message}`);
-        // Try to recover by just waiting
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.error(`[PGlite] READINESS FAILED: ${err.message}`);
+        if (err.message.includes("mutex") || err.message.includes("lock")) {
+           console.error(`[PGlite] LOCK CONTENTION DETECTED. This usually means another process is accessing the DB.`);
+        }
+        // If it hangs or fails, we're in trouble, but let's not crash the boot
       }
     })();
 
-    console.log(`[PGlite] Database instance created (awaiting readiness...)`);
     return instance;
   } catch (err: any) {
-    console.error(`[PGlite] CRITICAL INITIALIZATION ERROR: ${err.message}`);
+    console.error(`[PGlite] CRITICAL BOOT ERROR: ${err.message}`);
     if (err.stack) console.error(err.stack);
-    throw err;
+    
+    // Last ditch fallback to memory so the server can at least start
+    console.log(`[PGlite] Falling back to IN-MEMORY due to boot failure`);
+    const fallback = new PGlite();
+    globalForPglite._pgliteInstance = fallback;
+    globalForPglite._pgliteReady = Promise.resolve();
+    return fallback;
   }
 }
 
