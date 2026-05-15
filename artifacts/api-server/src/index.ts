@@ -47,26 +47,27 @@ async function ensureSchema() {
   const { client } = await import("@workspace/db");
 
   // PGlite must be fully initialized before queries
+  // waitReady is a Promise property, not a function
+  logger.info({ waitReadyType: typeof client.waitReady, clientKeys: Object.keys(client).slice(0, 10) }, "PGlite client info");
+  
   try {
-    if (typeof client.waitReady === "function") {
-      logger.info("Waiting for PGlite to be ready...");
+    if (client.waitReady && typeof client.waitReady.then === "function") {
+      logger.info("Awaiting PGlite waitReady promise...");
       await client.waitReady;
-      logger.info("PGlite is ready");
+      logger.info("PGlite waitReady resolved");
     } else {
-      // Try a simple query to ensure connection
-      logger.info("Testing PGlite connection...");
+      logger.info("No waitReady promise, trying direct query...");
       await client.query("SELECT 1");
-      logger.info("PGlite connection verified");
+      logger.info("PGlite direct query succeeded");
     }
   } catch (err: any) {
-    logger.error({ err: err.message, stack: err.stack }, "PGlite NOT READY — waiting and retrying...");
-    // Wait a bit and try again
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    logger.error({ err: err.message }, "PGlite initial readiness check failed, retrying in 3s...");
+    await new Promise(resolve => setTimeout(resolve, 3000));
     try {
       await client.query("SELECT 1");
-      logger.info("PGlite connection verified on retry");
+      logger.info("PGlite retry query succeeded");
     } catch (err2: any) {
-      logger.error({ err: err2.message }, "PGlite STILL NOT READY after retry — schema creation may fail");
+      logger.error({ err: err2.message }, "PGlite STILL failing after retry");
     }
   }
 
