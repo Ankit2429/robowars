@@ -153,7 +153,7 @@ export default function Admin() {
           <ul className="admin-nav">
             <li className={activeTab === "roster" ? "active" : ""} onClick={() => setActiveTab("roster")}>Roster</li>
             <li className={activeTab === "bracket" ? "active" : ""} onClick={() => setActiveTab("bracket")}>Tournament Bracket</li>
-            <li className={activeTab === "codes" ? "active" : ""} onClick={() => setActiveTab("codes")}>Access Codes</li>
+
           </ul>
           <div style={{ marginTop: '2rem', borderTop: '1px solid var(--primary-dim)', paddingTop: '1rem' }}>
             <Link href="/" className="nav-btn" style={{ width: '100%', textAlign: 'left', display: 'block' }}>
@@ -223,24 +223,7 @@ export default function Admin() {
             </div>
           )}
 
-          {activeTab === "codes" && (
-            <div>
-              <h2>Manage Access Codes</h2>
-              <p style={{ marginBottom: '1rem' }}>Create codes that players must use to register.</p>
-              <form onSubmit={handleAddCode} style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                <input className="robowars-input" type="text" value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="New Access Code" required style={{ flex: 1 }} />
-                <button type="submit" className="btn primary-btn" style={{ width: 'auto' }}>Add Code</button>
-              </form>
-              <div className="codes-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {codes.map((c: string) => (
-                  <div key={c} className="code-item" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary-dim)', padding: '1rem', borderRadius: '6px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ background: 'var(--primary-color)', color: 'var(--bg-color)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>{c}</span>
-                    <button onClick={() => handleDeleteCode(c)} style={{ background: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Remove</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
