@@ -29,6 +29,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+import path from "path";
+import fs from "fs";
+
 app.use("/api", router);
+
+// Serve the frontend build if it exists
+const frontendDist = path.join(__dirname, "../../robo-arena/dist/public");
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;
