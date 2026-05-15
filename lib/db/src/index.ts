@@ -29,14 +29,35 @@ function createClient(): PGlite {
     return globalForPglite._pgliteInstance;
   }
 
-  console.log(`[PGlite] Initializing database at: ${dbPath}`);
-  const instance = new PGlite(dbPath);
-  globalForPglite._pgliteInstance = instance;
-  return instance;
+  try {
+    console.log(`[PGlite] Attempting to initialize database at: ${dbPath}`);
+    const instance = new PGlite(dbPath);
+    globalForPglite._pgliteInstance = instance;
+    console.log(`[PGlite] Database successfully initialized`);
+    return instance;
+  } catch (err: any) {
+    console.error(`[PGlite] CRITICAL INITIALIZATION ERROR: ${err.message}`);
+    if (err.stack) console.error(err.stack);
+    // On Render, we might want to fail fast so it can restart
+    throw err;
+  }
 }
 
 // Initialize PGlite with persistent storage on disk
 export const client = createClient();
 export const db = drizzle(client, { schema });
+
+/**
+ * Simple connectivity check for health endpoints
+ */
+export async function checkDatabaseConnection() {
+  try {
+    await client.query("SELECT 1");
+    return true;
+  } catch (err) {
+    console.error("[PGlite] Connection check failed", err);
+    return false;
+  }
+}
 
 export * from "./schema";

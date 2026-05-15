@@ -37,6 +37,16 @@ app.get("/api/debug/ping", (_req, res) => {
   res.json({ ok: true, cwd: process.cwd(), dirname: __dirname, node: process.version, pid: process.pid });
 });
 
+app.get("/health", async (_req, res) => {
+  const { checkDatabaseConnection } = await import("@workspace/db");
+  const isDbUp = await checkDatabaseConnection();
+  if (isDbUp) {
+    res.json({ status: "healthy", db: "connected", timestamp: new Date().toISOString() });
+  } else {
+    res.status(503).json({ status: "unhealthy", db: "disconnected", timestamp: new Date().toISOString() });
+  }
+});
+
 app.use("/api", router);
 
 // ── Global error handler for API routes ──
