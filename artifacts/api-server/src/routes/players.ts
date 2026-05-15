@@ -28,8 +28,8 @@ router.post("/players/register", async (req, res): Promise<void> => {
     // Check access code
     const codes = await db.select().from(accessCodesTable).where(eq(accessCodesTable.code, code));
     if (codes.length === 0) {
-      // For the first deployment, if no codes exist, allow 'BATTLE24' and 'ROBOCODE'
-      const defaultCodes = ['BATTLE24', 'ROBOCODE'];
+      // Fallback default codes if none exist in the database yet
+      const defaultCodes = ['bot123'];
       if (!defaultCodes.includes(code)) {
         res.status(403).json({ error: "Invalid Access Code" });
         return;
