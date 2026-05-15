@@ -22,6 +22,12 @@ async function boot() {
 
     const server = createServer(app);
     
+    // Wait for PGlite to be fully initialized (it's async)
+    const { waitForDB } = await import("@workspace/db");
+    logger.info("Waiting for PGlite to be ready...");
+    await waitForDB();
+    logger.info("PGlite is ready");
+
     // Ensure database schema exists before starting
     await ensureSchema();
     logger.info("Database schema verified");

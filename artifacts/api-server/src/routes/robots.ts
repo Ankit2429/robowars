@@ -64,6 +64,8 @@ function computeStats(bodyId: string, attackId: string, defenseId: string, secon
 
 router.get("/robots", async (req, res) => {
   try {
+    const { waitForDB } = await import("@workspace/db");
+    await waitForDB();
     const robots = await db.select().from(robotsTable).orderBy(robotsTable.createdAt);
     res.json(robots.map(r => ({
       ...r,
@@ -76,6 +78,9 @@ router.get("/robots", async (req, res) => {
 });
 
 router.post("/robots", async (req, res): Promise<void> => {
+  const { waitForDB } = await import("@workspace/db");
+  await waitForDB();
+  
   const parsed = CreateRobotBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid robot data", details: parsed.error.issues });
@@ -115,6 +120,8 @@ router.get("/robots/:id", async (req, res): Promise<void> => {
   }
 
   try {
+    const { waitForDB } = await import("@workspace/db");
+    await waitForDB();
     const [robot] = await db.select().from(robotsTable).where(eq(robotsTable.id, id));
     if (!robot) {
       res.status(404).json({ error: "Robot not found" });

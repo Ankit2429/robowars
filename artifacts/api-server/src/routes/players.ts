@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, client } from "@workspace/db";
+import { client, waitForDB } from "@workspace/db";
 import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -18,6 +18,7 @@ let tableEnsured = false;
 async function ensurePlayersTable() {
   if (tableEnsured) return;
   try {
+    await waitForDB();
     await client.query(`
       CREATE TABLE IF NOT EXISTS players (
         id SERIAL PRIMARY KEY,
@@ -30,9 +31,10 @@ async function ensurePlayersTable() {
       )
     `);
     tableEnsured = true;
-    console.log("[Players] players table ensured");
+    console.log("[Players] players table ensured and DB ready");
   } catch (err: any) {
-    console.error("[Players] FAILED to ensure players table:", err.message);
+    console.error("[Players] FAILED to ensure players table or DB not ready:", err.message);
+    throw err; // Re-throw to be caught by the route handler
   }
 }
 
@@ -60,7 +62,13 @@ router.post("/players/register", async (req, res): Promise<void> => {
   req.log.info({ code }, "Access code accepted");
 
   // Step 2.5: Ensure table exists before any DB query
-  await ensurePlayersTable();
+  try {
+    await ensurePlayersTable();
+  } catch (err: any) {
+    req.log.error({ err: err.message }, "FAILED to ensure players table in registration route");
+    res.status(500).json({ error: "Database initialization error", detail: err.message });
+    return;
+  }
 
   // Step 3: Check for duplicate USN using raw SQL (bypasses Drizzle ORM issues)
   try {
