@@ -4,7 +4,6 @@ import { db } from "@workspace/db";
 import { roomsTable, leaderboardTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./lib/logger";
-
 import { globalEvents, EVENTS } from "./lib/events";
 
 interface Player {
@@ -23,58 +22,122 @@ interface QueueEntry {
   robotId?: number;
 }
 
-const rooms = new Map<string, { players: Player[]; status: string; timer?: ReturnType<typeof setInterval> }>();
+const rooms = new Map<string, { players: Player[]; status: string }>();
 const matchQueue: QueueEntry[] = [];
 
+// ── Exported accessors for debug API ────────────────────────────────────────
+let _io: SocketIOServer | null = null;
+
+export function getDebugState() {
+  const connectedSockets = _io
+    ? Array.from(_io.sockets.sockets.values()).map(s => ({
+        id: s.id,
+        playerName: s.data.playerName || null,
+        inQueue: s.data.inQueue || false,
+        roomId: s.data.roomId || null,
+        transport: s.conn?.transport?.name || "unknown",
+        connected: s.connected,
+      }))
+    : [];
+
+  return {
+    timestamp: new Date().toISOString(),
+    connectedSocketCount: connectedSockets.length,
+    connectedSockets,
+    matchQueue: matchQueue.map(q => ({
+      socketId: q.socketId,
+      playerName: q.playerName,
+      robotId: q.robotId,
+    })),
+    matchQueueLength: matchQueue.length,
+    rooms: Array.from(rooms.entries()).map(([id, room]) => ({
+      id,
+      status: room.status,
+      players: room.players.map(p => ({
+        socketId: p.socketId,
+        playerName: p.playerName,
+        hp: p.hp,
+      })),
+    })),
+    roomCount: rooms.size,
+  };
+}
+
+// ── Setup ───────────────────────────────────────────────────────────────────
 export function setupSocketIO(server: HttpServer) {
   const io = new SocketIOServer(server, {
     path: "/socket.io",
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ["websocket", "polling"],
+    pingInterval: 10000,
+    pingTimeout: 5000,
   });
+  _io = io;
 
   // Listen for admin changes and broadcast to all players
   globalEvents.on(EVENTS.MATCHMAKING_STATUS_CHANGED, (active: boolean) => {
-    logger.info({ active }, "Broadcasting matchmaking status change");
+    logger.info({ active, socketCount: io.sockets.sockets.size }, "Broadcasting matchmaking status change to all sockets");
     io.emit("matchmakingStatusChanged", { active });
   });
 
-  const broadcastQueueUpdate = () => {
-    const count = matchQueue.length;
-    logger.debug({ count }, "Broadcasting queue update");
-    io.emit("queueUpdate", { count });
+  const broadcastDebug = () => {
+    const state = getDebugState();
+    io.emit("debugState", state);
+    io.emit("queueUpdate", { count: state.matchQueueLength });
   };
 
   io.on("connection", (socket) => {
-    logger.info({ socketId: socket.id, transport: socket.conn.transport.name }, "Socket connected");
+    logger.info({
+      socketId: socket.id,
+      transport: socket.conn.transport.name,
+      remoteAddress: socket.handshake.address,
+      origin: socket.handshake.headers.origin || "none",
+      totalConnected: io.sockets.sockets.size,
+    }, "Socket CONNECTED");
 
-    // ── Matchmaking ────────────────────────────────────────────────────────────
+    // Send immediate debug state to new connection
+    socket.emit("debugState", getDebugState());
+
+    // ── Matchmaking ──────────────────────────────────────────────────────────
     socket.on("findMatch", ({ playerName, robotId }: { playerName: string; robotId?: number }) => {
-      logger.info({ socketId: socket.id, playerName, robotId }, "Player requesting match");
-      
+      logger.info({ socketId: socket.id, playerName, robotId, currentQueueLength: matchQueue.length }, "findMatch received");
+
       // Remove any existing entry for this socket
       const existingIdx = matchQueue.findIndex(p => p.socketId === socket.id);
-      if (existingIdx !== -1) matchQueue.splice(existingIdx, 1);
+      if (existingIdx !== -1) {
+        logger.info({ socketId: socket.id }, "Removed duplicate queue entry");
+        matchQueue.splice(existingIdx, 1);
+      }
 
       matchQueue.push({ socketId: socket.id, playerName, robotId });
       socket.data.inQueue = true;
       socket.data.playerName = playerName;
 
-      logger.info({ playerName, queueLength: matchQueue.length }, "Player added to matchQueue");
-      broadcastQueueUpdate();
+      logger.info({
+        playerName,
+        queueLength: matchQueue.length,
+        queueContents: matchQueue.map(q => q.playerName),
+      }, "Player ADDED to matchQueue");
+
+      broadcastDebug();
 
       if (matchQueue.length >= 2) {
         const p1 = matchQueue.shift()!;
         const p2 = matchQueue.shift()!;
         const roomId = `match_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-        logger.info({ p1: p1.playerName, p2: p2.playerName, roomId }, "Match found — creating room");
+        logger.info({
+          p1: p1.playerName, p1Socket: p1.socketId,
+          p2: p2.playerName, p2Socket: p2.socketId,
+          roomId,
+        }, "MATCH FOUND — pairing two players");
+
         rooms.set(roomId, { players: [], status: "waiting" });
 
         io.to(p1.socketId).emit("matchFound", { roomId, opponentName: p2.playerName, side: "p1" });
         io.to(p2.socketId).emit("matchFound", { roomId, opponentName: p1.playerName, side: "p2" });
 
-        broadcastQueueUpdate();
+        broadcastDebug();
 
         db.insert(roomsTable).values({
           id: roomId,
@@ -83,24 +146,27 @@ export function setupSocketIO(server: HttpServer) {
           status: "waiting",
           playerCount: 0,
           maxPlayers: 2,
-        }).catch(err => logger.error({ err }, "Failed to create match room record in DB"));
+        }).catch(err => logger.error({ err }, "Failed to insert match room into DB"));
       } else {
+        logger.info({ playerName, queueLength: matchQueue.length }, "Waiting for opponent — emitting matchSearching");
         socket.emit("matchSearching");
       }
     });
 
     socket.on("cancelMatch", () => {
-      logger.info({ socketId: socket.id, playerName: socket.data.playerName }, "Player canceled matchmaking");
+      logger.info({ socketId: socket.id, playerName: socket.data.playerName }, "cancelMatch received");
       const idx = matchQueue.findIndex(p => p.socketId === socket.id);
       if (idx !== -1) {
         matchQueue.splice(idx, 1);
-        broadcastQueueUpdate();
+        logger.info({ playerName: socket.data.playerName, newQueueLength: matchQueue.length }, "Player REMOVED from queue");
       }
       socket.data.inQueue = false;
+      broadcastDebug();
     });
 
-    // ── Room join ──────────────────────────────────────────────────────────────
+    // ── Room join ────────────────────────────────────────────────────────────
     socket.on("joinRoom", async ({ roomId, playerName, robotId }: { roomId: string; playerName: string; robotId?: number }) => {
+      logger.info({ socketId: socket.id, roomId, playerName }, "joinRoom received");
       socket.join(roomId);
 
       if (!rooms.has(roomId)) {
@@ -114,12 +180,8 @@ export function setupSocketIO(server: HttpServer) {
       }
 
       try {
-        await db.update(roomsTable)
-          .set({ playerCount: room.players.length })
-          .where(eq(roomsTable.id, roomId));
-      } catch (err) {
-        logger.error({ err }, "Failed to update room player count");
-      }
+        await db.update(roomsTable).set({ playerCount: room.players.length }).where(eq(roomsTable.id, roomId));
+      } catch (err) { logger.error({ err }, "Failed to update room player count"); }
 
       io.to(roomId).emit("roomUpdate", {
         players: room.players.map(p => ({ playerName: p.playerName, hp: p.hp, robotId: p.robotId, x: p.x, z: p.z })),
@@ -128,11 +190,10 @@ export function setupSocketIO(server: HttpServer) {
 
       if (room.players.length >= 2 && room.status === "waiting") {
         room.status = "fighting";
+        logger.info({ roomId, players: room.players.map(p => p.playerName) }, "Battle STARTING");
         try {
           await db.update(roomsTable).set({ status: "fighting" }).where(eq(roomsTable.id, roomId));
-        } catch (err) {
-          logger.error({ err }, "Failed to update room status");
-        }
+        } catch (err) { logger.error({ err }, "Failed to update room status"); }
         io.to(roomId).emit("battleStart", {
           players: room.players.map(p => ({ playerName: p.playerName, hp: p.hp, robotId: p.robotId })),
         });
@@ -140,74 +201,58 @@ export function setupSocketIO(server: HttpServer) {
 
       socket.data.roomId = roomId;
       socket.data.playerName = playerName;
+      broadcastDebug();
     });
 
-    // ── Movement sync ──────────────────────────────────────────────────────────
+    // ── Movement sync ────────────────────────────────────────────────────────
     socket.on("move", ({ roomId, x, z }: { roomId: string; x: number; z: number }) => {
       const room = rooms.get(roomId);
       if (!room) return;
       const player = room.players.find(p => p.socketId === socket.id);
-      if (player) {
-        player.x = x;
-        player.z = z;
-      }
+      if (player) { player.x = x; player.z = z; }
       socket.to(roomId).emit("opponentMove", { x, z });
     });
 
-    // ── Attack ─────────────────────────────────────────────────────────────────
+    // ── Attack ───────────────────────────────────────────────────────────────
     socket.on("attack", ({ roomId, attackType, damage }: { roomId: string; attackType: "punch" | "kick" | "special"; damage: number }) => {
       const room = rooms.get(roomId);
       if (!room || room.status !== "fighting") return;
-
       const attacker = room.players.find(p => p.socketId === socket.id);
       const defender = room.players.find(p => p.socketId !== socket.id);
       if (!attacker || !defender) return;
 
-      // Validate position — attack only lands if close enough
       const dx = attacker.x - defender.x;
       const dz = attacker.z - defender.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
       const inRange = dist < 5;
-
       const actualDamage = inRange ? Math.max(0, damage) : 0;
-      if (inRange) {
-        defender.hp = Math.max(0, defender.hp - actualDamage);
-      }
+      if (inRange) { defender.hp = Math.max(0, defender.hp - actualDamage); }
 
       io.to(roomId).emit("attackResult", {
-        attackerName: attacker.playerName,
-        defenderName: defender.playerName,
-        damage: actualDamage,
-        isCritical: attackType === "special",
-        defenderHp: defender.hp,
-        attackType,
-        hit: inRange,
+        attackerName: attacker.playerName, defenderName: defender.playerName,
+        damage: actualDamage, isCritical: attackType === "special",
+        defenderHp: defender.hp, attackType, hit: inRange,
       });
 
-      if (defender.hp <= 0) {
-        endBattle(io, roomId, attacker.playerName, defender.playerName);
-      }
+      if (defender.hp <= 0) { endBattle(io, roomId, attacker.playerName, defender.playerName); }
     });
 
     socket.on("battleEnd", ({ roomId, winnerName, loserName }: { roomId: string; winnerName: string; loserName: string }) => {
       endBattle(io, roomId, winnerName, loserName);
     });
 
-    // ── Disconnect ─────────────────────────────────────────────────────────────
-    socket.on("disconnect", () => {
-      logger.info({ 
-        socketId: socket.id, 
-        playerName: socket.data.playerName, 
-        inQueue: socket.data.inQueue,
-        roomId: socket.data.roomId 
-      }, "Socket disconnected");
+    // ── Disconnect ───────────────────────────────────────────────────────────
+    socket.on("disconnect", (reason) => {
+      logger.info({
+        socketId: socket.id, playerName: socket.data.playerName,
+        inQueue: socket.data.inQueue, roomId: socket.data.roomId,
+        reason, remainingConnected: io.sockets.sockets.size,
+      }, "Socket DISCONNECTED");
 
-      // Remove from matchmaking queue
       const qIdx = matchQueue.findIndex(p => p.socketId === socket.id);
       if (qIdx !== -1) {
         matchQueue.splice(qIdx, 1);
-        logger.info({ playerName: socket.data.playerName }, "Player removed from queue due to disconnect");
-        broadcastQueueUpdate();
+        logger.info({ playerName: socket.data.playerName, newQueueLength: matchQueue.length }, "Removed from queue on disconnect");
       }
 
       const roomId = socket.data.roomId as string | undefined;
@@ -215,10 +260,10 @@ export function setupSocketIO(server: HttpServer) {
         const room = rooms.get(roomId);
         if (room) {
           room.players = room.players.filter(p => p.socketId !== socket.id);
-          logger.info({ playerName: socket.data.playerName, roomId }, "Player removed from room due to disconnect");
           io.to(roomId).emit("playerLeft", { playerName: socket.data.playerName });
         }
       }
+      broadcastDebug();
     });
   });
 
@@ -229,40 +274,23 @@ async function endBattle(io: SocketIOServer, roomId: string, winnerName: string,
   const room = rooms.get(roomId);
   if (!room || room.status === "finished") return;
   room.status = "finished";
-
-  try {
-    await db.update(roomsTable).set({ status: "finished" }).where(eq(roomsTable.id, roomId));
-  } catch (err) {
-    logger.error({ err }, "Failed to update room status to finished");
-  }
-
+  try { await db.update(roomsTable).set({ status: "finished" }).where(eq(roomsTable.id, roomId)); }
+  catch (err) { logger.error({ err }, "Failed to update room status to finished"); }
   io.to(roomId).emit("battleEnd", { winnerName, loserName });
-
-  try {
-    await upsertLeaderboard(winnerName, true);
-    await upsertLeaderboard(loserName, false);
-  } catch (err) {
-    logger.error({ err }, "Failed to update leaderboard");
-  }
-
+  try { await upsertLeaderboard(winnerName, true); await upsertLeaderboard(loserName, false); }
+  catch (err) { logger.error({ err }, "Failed to update leaderboard"); }
   rooms.delete(roomId);
 }
 
 async function upsertLeaderboard(playerName: string, won: boolean) {
-  const existing = await db.select().from(leaderboardTable)
-    .where(eq(leaderboardTable.playerName, playerName));
-
+  const existing = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, playerName));
   if (existing.length === 0) {
-    const wins = won ? 1 : 0;
-    const losses = won ? 0 : 1;
+    const wins = won ? 1 : 0; const losses = won ? 0 : 1;
     await db.insert(leaderboardTable).values({ playerName, wins, losses, totalBattles: 1, winRate: wins });
   } else {
     const e = existing[0];
-    const wins = e.wins + (won ? 1 : 0);
-    const losses = e.losses + (won ? 0 : 1);
+    const wins = e.wins + (won ? 1 : 0); const losses = e.losses + (won ? 0 : 1);
     const totalBattles = e.totalBattles + 1;
-    await db.update(leaderboardTable)
-      .set({ wins, losses, totalBattles, winRate: wins / totalBattles })
-      .where(eq(leaderboardTable.playerName, playerName));
+    await db.update(leaderboardTable).set({ wins, losses, totalBattles, winRate: wins / totalBattles }).where(eq(leaderboardTable.playerName, playerName));
   }
 }

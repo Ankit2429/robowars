@@ -37,6 +37,16 @@ app.get("/api/debug/ping", (_req, res) => {
   res.json({ ok: true, cwd: process.cwd(), dirname: __dirname, node: process.version, pid: process.pid });
 });
 
+// Multiplayer debug endpoint — shows live socket/queue/room state
+app.get("/api/debug/multiplayer", (_req, res) => {
+  try {
+    const { getDebugState } = require("./socket");
+    res.json(getDebugState());
+  } catch (err: any) {
+    res.json({ error: err.message });
+  }
+});
+
 app.get("/health", async (_req, res) => {
   const { checkDatabaseConnection } = await import("@workspace/db");
   const isDbUp = await checkDatabaseConnection();

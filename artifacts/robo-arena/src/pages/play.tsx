@@ -5,6 +5,7 @@ import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock } from "lucide-react"
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
 import { getApiUrl } from "@/lib/api-url";
+import { MultiplayerDebugPanel } from "@/components/MultiplayerDebugPanel";
 
 interface StoredRobot {
   playerName: string;
@@ -29,26 +30,47 @@ export default function Play() {
     if (saved) setMyRobot(JSON.parse(saved));
 
     // Initialize socket connection using centralized URL
-    const socket = io(getApiUrl(), {
+    const url = getApiUrl();
+    console.log("[Play] Connecting socket to:", url);
+    const socket = io(url, {
       path: "/socket.io",
-      transports: ["websocket", "polling"]
+      transports: ["websocket", "polling"],
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => console.log("[Play] Socket connected, id:", socket.id));
-    socket.on("connect_error", (err) => console.error("[Play] Socket connect_error:", err.message));
-    socket.on("disconnect", (reason) => console.warn("[Play] Socket disconnected:", reason));
+    socket.on("connect", () => {
+      console.log("[Play] Socket CONNECTED, id:", socket.id, "transport:", socket.io.engine?.transport?.name);
+    });
+    socket.on("connect_error", (err) => {
+      console.error("[Play] Socket CONNECT_ERROR:", err.message, "URL was:", url);
+    });
+    socket.on("disconnect", (reason) => {
+      console.warn("[Play] Socket DISCONNECTED:", reason);
+    });
+
     socket.on("matchmakingStatusChanged", ({ active }) => {
-      console.log("[Play] Matchmaking status changed:", active);
+      console.log("[Play] matchmakingStatusChanged received:", active);
       if (active) {
-        setMatchState(prev => prev === "awaiting_admin" ? "searching" : prev);
+        setMatchState(prev => {
+          if (prev === "awaiting_admin") {
+            console.log("[Play] Transitioning from awaiting_admin -> searching");
+            return "searching";
+          }
+          return prev;
+        });
       } else {
-        setMatchState(prev => prev === "searching" ? "awaiting_admin" : prev);
+        setMatchState(prev => {
+          if (prev === "searching") {
+            console.log("[Play] Transitioning from searching -> awaiting_admin (matchmaking stopped)");
+            return "awaiting_admin";
+          }
+          return prev;
+        });
       }
     });
 
     socket.on("matchFound", ({ roomId, opponentName }) => {
-      console.log("[Play] Match found!", { roomId, opponentName });
+      console.log("[Play] MATCH FOUND!", { roomId, opponentName });
       setFound({ opponentName, roomId });
       setMatchState("found");
       setTimeout(() => {
@@ -56,20 +78,27 @@ export default function Play() {
       }, 3000);
     });
 
+    socket.on("matchSearching", () => {
+      console.log("[Play] matchSearching acknowledged — waiting in queue");
+    });
+
     return () => {
+      console.log("[Play] Cleaning up socket");
       socket.disconnect();
     };
   }, []);
 
+  // Search timer + emit findMatch
   useEffect(() => {
     if (matchState === "searching") {
       timerRef.current = setInterval(() => setSearchTime(t => t + 1), 1000);
-      
+
       // Notify backend we are searching
       if (socketRef.current && myRobot) {
-        socketRef.current.emit("findMatch", { 
-          playerName: myRobot.playerName, 
-          robotId: (myRobot as any).robotId 
+        console.log("[Play] Emitting findMatch:", { playerName: myRobot.playerName });
+        socketRef.current.emit("findMatch", {
+          playerName: myRobot.playerName,
+          robotId: (myRobot as any).robotId,
         });
       }
     } else {
@@ -82,11 +111,14 @@ export default function Play() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [matchState, myRobot]);
 
+  // Initial settings check when entering awaiting_admin
   useEffect(() => {
     if (matchState === "awaiting_admin") {
-      // Initial check
+      console.log("[Play] Checking initial matchmaking status...");
       customFetch<any>("/api/settings").then(settings => {
+        console.log("[Play] Settings response:", settings);
         if (settings.matchmakingActive) {
+          console.log("[Play] Matchmaking already active — going straight to searching");
           setMatchState("searching");
         }
       }).catch(err => console.error("[Play] Initial settings check failed:", err));
@@ -95,14 +127,17 @@ export default function Play() {
 
   const handleFindMatch = () => {
     if (!myRobot) return;
+    console.log("[Play] handleFindMatch called");
     setMatchState("awaiting_admin");
   };
 
   const handleCancel = () => {
+    console.log("[Play] handleCancel called");
     setMatchState("idle");
     setFound(null);
   };
 
+  // AI fallback COMPLETELY DISABLED — players must wait for real opponents
   const handleAITraining = () => {
     setLocation("/battle/ai");
   };
@@ -131,7 +166,6 @@ export default function Play() {
         {/* Robot preview */}
         {myRobot ? (
           <div className="brutal-border bg-card p-4 mb-8 flex items-center gap-4">
-            {/* Color swatch mini-robot */}
             <div className="flex gap-1 shrink-0">
               <div className="w-4 h-10 rounded-sm" style={{ backgroundColor: myRobot.bodyColor }} />
               <div className="w-4 h-8 rounded-sm mt-1" style={{ backgroundColor: myRobot.attackColor }} />
@@ -237,21 +271,19 @@ export default function Play() {
                       {Math.floor(searchTime / 60).toString().padStart(2,"0")}:{(searchTime % 60).toString().padStart(2,"0")}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-2 w-full max-w-[200px]">
-                    <button onClick={handleAITraining} className="brutal-button px-4 py-2 text-xs border-secondary text-secondary hover:bg-secondary hover:text-black transition-colors">
-                      <Bot className="h-4 w-4 inline mr-2" /> PLAY VS AI
-                    </button>
-                    <button onClick={handleCancel} className="brutal-button px-4 py-2 text-xs flex items-center justify-center gap-2">
-                      <X className="h-4 w-4" /> CANCEL
-                    </button>
-                  </div>
-                  <p className="font-mono text-[10px] text-muted-foreground text-center mt-2">Waiting for an opponent...</p>
+                  <p className="font-mono text-xs text-muted-foreground text-center">Waiting for a real opponent...<br/>No AI fallback — real players only.</p>
+                  <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2 mt-4">
+                    <X className="h-4 w-4" /> CANCEL
+                  </button>
                 </>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Debug panel — always visible */}
+      <MultiplayerDebugPanel socket={socketRef.current} />
     </div>
   );
 }
