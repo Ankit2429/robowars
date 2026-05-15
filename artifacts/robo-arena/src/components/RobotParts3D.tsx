@@ -96,7 +96,7 @@ export function TitanChassis({ intensity = 1, teamColor = "#8B0000" }: { intensi
   );
 }
 
-export function WaspChassis({ intensity = 1 }: { intensity?: number }) {
+export function WaspChassis({ intensity = 1, teamColor }: { intensity?: number; teamColor?: string }) {
   return (
     <group position={[0, 0.18, 0]}>
       {/* Ultra-low carbon fiber main plate */}
@@ -133,7 +133,7 @@ export function WaspChassis({ intensity = 1 }: { intensity?: number }) {
   );
 }
 
-export function GoliathChassis() {
+export function GoliathChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.5, 0]}>
       {/* Massive layered hull */}
@@ -173,7 +173,7 @@ export function GoliathChassis() {
   );
 }
 
-export function PhantomChassis({ intensity = 1 }: { intensity?: number }) {
+export function PhantomChassis({ intensity = 1, teamColor }: { intensity?: number; teamColor?: string }) {
   return (
     <group position={[0, 0.38, 0]}>
       {/* Asymmetric stealth hull - offset spine */}
@@ -198,7 +198,7 @@ export function PhantomChassis({ intensity = 1 }: { intensity?: number }) {
   );
 }
 
-export function FortressChassis() {
+export function FortressChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.7, 0]}>
       {/* Triple-layered iron core */}
@@ -224,7 +224,7 @@ export function FortressChassis() {
   );
 }
 
-export function ViperChassis({ intensity = 1 }: { intensity?: number }) {
+export function ViperChassis({ intensity = 1, teamColor }: { intensity?: number; teamColor?: string }) {
   return (
     <group position={[0, 0.28, 0]}>
       {/* Narrow high-speed spine */}
@@ -254,7 +254,7 @@ export function ViperChassis({ intensity = 1 }: { intensity?: number }) {
   );
 }
 
-export function ColossusChassis() {
+export function ColossusChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.55, 0]}>
       {/* Massive wide forged iron body */}
@@ -286,7 +286,7 @@ export function ColossusChassis() {
   );
 }
 
-export function WraithChassis({ intensity = 1 }: { intensity?: number }) {
+export function WraithChassis({ intensity = 1, teamColor }: { intensity?: number; teamColor?: string }) {
   return (
     <group position={[0, 0.45, 0]}>
       {/* Central narrow spine tube */}
@@ -311,7 +311,7 @@ export function WraithChassis({ intensity = 1 }: { intensity?: number }) {
   );
 }
 
-export function BulwarkChassis() {
+export function BulwarkChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.48, 0]}>
       {/* Massive titanium block hull */}
@@ -336,7 +336,7 @@ export function BulwarkChassis() {
   );
 }
 
-export function LynxChassis() {
+export function LynxChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.38, 0]}>
       {/* Low-profile aerodynamic hull */}
@@ -361,7 +361,7 @@ export function LynxChassis() {
   );
 }
 
-export function RhinoChassis() {
+export function RhinoChassis({ intensity, teamColor }: { intensity?: number; teamColor?: string } = {}) {
   return (
     <group position={[0, 0.48, 0]}>
       {/* Heavy square brawler body */}
@@ -385,7 +385,7 @@ export function RhinoChassis() {
   );
 }
 
-export function ShadowChassis({ intensity = 1 }: { intensity?: number }) {
+export function ShadowChassis({ intensity = 1, teamColor }: { intensity?: number; teamColor?: string }) {
   return (
     <group position={[0, 0.12, 0]}>
       {/* Flat ultra-low matte-black plate */}
@@ -534,8 +534,8 @@ export function LifterFork() {
       {([-0.6, 0.6] as const).map(x => (
         <group key={`fork-${x}`} position={[x, 0, 0]}>
           <mesh castShadow receiveShadow><boxGeometry args={[0.2, 0.1, 2.0]} /><meshStandardMaterial {...STEEL_LIGHT} /></mesh>
-          <mesh position={[0, 0.051, 0]}><planeGeometry args={[0.2, 2.0]} rotation={[-Math.PI/2,0,0]} /><meshStandardMaterial {...CHROME} /></mesh>
-          <mesh position={[0, -0.1, -0.5]} castShadow><cylinderGeometry args={[0.05, 0.05, 1.0, 16]} rotation={[Math.PI/2,0,0]} /><meshStandardMaterial {...CHROME} /></mesh>
+          <mesh position={[0, 0.051, 0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[0.2, 2.0]} /><meshStandardMaterial {...CHROME} /></mesh>
+          <mesh position={[0, -0.1, -0.5]} rotation={[Math.PI/2,0,0]} castShadow><cylinderGeometry args={[0.05, 0.05, 1.0, 16]} /><meshStandardMaterial {...CHROME} /></mesh>
           <mesh position={[0, 0.1, 0.95]} rotation={[0.2, 0, 0]} castShadow><boxGeometry args={[0.2, 0.1, 0.4]} /><meshStandardMaterial {...STEEL_LIGHT} /></mesh>
         </group>
       ))}
@@ -992,7 +992,7 @@ export function IronFortressShell() {
 export function Flamethrower({ intensity = 1 }: { intensity?: number }) {
   return (
     <group position={[-1.25, 0.6, 0]}>
-      <mesh castShadow receiveShadow position={[0, 0, 0]}><cylinderGeometry args={[0.2, 0.2, 1.0, 16]} rotation={[Math.PI/2,0,0]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
+      <mesh castShadow receiveShadow position={[0, 0, 0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[0.2, 0.2, 1.0, 16]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
       <mesh position={[0, 0, 0.5]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[0.1, 0.15, 0.4, 16]} /><meshStandardMaterial color="#444466" metalness={0.8} roughness={0.4} /></mesh>
       <mesh position={[0, 0, 0.7]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[0.05, 0.1, 0.2, 16]} /><meshStandardMaterial color="#000000" /></mesh>
       <mesh position={[0, 0, 0.85]}><sphereGeometry args={[0.05, 16, 16]} /><meshStandardMaterial color="#0066ff" emissive="#0066ff" emissiveIntensity={intensity} /></mesh>
@@ -1374,7 +1374,7 @@ export function HighFidelityRobotMesh({
           </mesh>
         </>
       )}
-      <BodyComp intensity={emissiveRef.current} teamColor={teamColor} />
+      <BodyComp intensity={emissiveRef.current} teamColor={teamColor} key="body" />
       <AttackComp intensity={emissiveRef.current} />
       <DefenseComp intensity={emissiveRef.current} />
       {SecondaryComp && <SecondaryComp intensity={emissiveRef.current} />}

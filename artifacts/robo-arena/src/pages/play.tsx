@@ -57,6 +57,7 @@ export default function Play() {
       }, 3000);
       return () => clearTimeout(timeout);
     }
+    return undefined;
   }, [matchState]);
 
   const handleFindMatch = () => {

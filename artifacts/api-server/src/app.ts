@@ -34,13 +34,43 @@ import fs from "fs";
 
 app.use("/api", router);
 
-// Serve the frontend build if it exists
-const frontendDist = path.join(__dirname, "../../robo-arena/dist/public");
-if (fs.existsSync(frontendDist)) {
+// ── Serve the frontend production build ──────────────────────────────────────
+// The Vite build outputs to artifacts/robo-arena/dist/public.
+// We try multiple candidate paths because __dirname varies depending on
+// whether the server is run from the bundled dist/ or from source, and
+// process.cwd() can differ between local dev and Render.
+const candidates = [
+  // 1. __dirname-relative (bundled server at artifacts/api-server/dist/)
+  path.resolve(__dirname, "../../robo-arena/dist/public"),
+  // 2. cwd-relative (Render sets cwd to the repo root)
+  path.resolve(process.cwd(), "artifacts/robo-arena/dist/public"),
+  // 3. cwd-relative (if Render root is the api-server artifact)
+  path.resolve(process.cwd(), "../robo-arena/dist/public"),
+  // 4. cwd-relative (if cwd is already the dist folder)
+  path.resolve(process.cwd(), "dist/public"),
+];
+
+let frontendDist: string | null = null;
+for (const candidate of candidates) {
+  const indexPath = path.join(candidate, "index.html");
+  if (fs.existsSync(indexPath)) {
+    frontendDist = candidate;
+    break;
+  }
+}
+
+if (frontendDist) {
+  logger.info({ path: frontendDist }, "Serving frontend static files");
   app.use(express.static(frontendDist));
+  // SPA fallback: serve index.html for any non-API route
   app.get("*", (req, res) => {
-    res.sendFile(path.join(frontendDist, "index.html"));
+    res.sendFile(path.join(frontendDist!, "index.html"));
   });
+} else {
+  logger.warn(
+    { candidates },
+    "Frontend dist not found — API-only mode. Checked paths listed above.",
+  );
 }
 
 export default app;

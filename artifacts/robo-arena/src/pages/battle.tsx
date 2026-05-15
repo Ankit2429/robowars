@@ -21,6 +21,9 @@ interface StoredRobot {
   attackColor: string;
   defenseColor: string;
   attackPartId?: string;
+  bodyPartId?: string;
+  defensePartId?: string;
+  secondaryWeaponId?: string;
   stats: { armor: number; power: number; speed: number; energy: number };
 }
 interface PosRef { x: number; z: number }
