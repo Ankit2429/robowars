@@ -27,27 +27,14 @@ router.post("/players/register", async (req, res): Promise<void> => {
   const { name, usn, branch, code } = parsed.data;
   req.log.info({ name, usn, branch, code }, "Parsed registration data");
 
-  // Step 2: Validate access code
-  try {
-    req.log.info({ code }, "Checking access code against database...");
-    const codes = await db.select().from(accessCodesTable).where(eq(accessCodesTable.code, code));
-    req.log.info({ foundCodes: codes.length, code }, "Access code DB lookup result");
-
-    if (codes.length === 0) {
-      // Fallback default codes if none exist in the database yet
-      const defaultCodes = ['bot123'];
-      req.log.info({ defaultCodes, providedCode: code, match: defaultCodes.includes(code) }, "No DB code found, checking defaults");
-      if (!defaultCodes.includes(code)) {
-        req.log.warn({ code }, "Invalid access code — rejected");
-        res.status(403).json({ error: "Invalid Access Code" });
-        return;
-      }
-    }
-  } catch (err: any) {
-    req.log.error({ err: err.message, stack: err.stack, code }, "FAILED to check access code — DB error");
-    res.status(500).json({ error: "Database error checking access code", detail: err.message });
+  // Step 2: Validate access code (hardcoded — no DB dependency)
+  const validCodes = ['bot123'];
+  if (!validCodes.includes(code)) {
+    req.log.warn({ code }, "Invalid access code — rejected");
+    res.status(403).json({ error: "Invalid Access Code" });
     return;
   }
+  req.log.info({ code }, "Access code accepted");
 
   // Step 3: Check for duplicate USN
   try {

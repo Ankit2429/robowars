@@ -46,6 +46,30 @@ async function boot() {
 async function ensureSchema() {
   const { client } = await import("@workspace/db");
 
+  // PGlite must be fully initialized before queries
+  try {
+    if (typeof client.waitReady === "function") {
+      logger.info("Waiting for PGlite to be ready...");
+      await client.waitReady;
+      logger.info("PGlite is ready");
+    } else {
+      // Try a simple query to ensure connection
+      logger.info("Testing PGlite connection...");
+      await client.query("SELECT 1");
+      logger.info("PGlite connection verified");
+    }
+  } catch (err: any) {
+    logger.error({ err: err.message, stack: err.stack }, "PGlite NOT READY — waiting and retrying...");
+    // Wait a bit and try again
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      await client.query("SELECT 1");
+      logger.info("PGlite connection verified on retry");
+    } catch (err2: any) {
+      logger.error({ err: err2.message }, "PGlite STILL NOT READY after retry — schema creation may fail");
+    }
+  }
+
   const tables = [
     {
       name: "players",
