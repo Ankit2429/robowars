@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Skull, Zap, Trophy } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "@/context/SessionContext";
+import { getApiUrl } from "@/lib/api-url";
 import { RageQuitModal } from "@/components/RageQuitModal";
 import { HighFidelityRobotMesh } from "@/components/RobotParts3D";
 
@@ -692,8 +693,7 @@ export default function Battle() {
   // Multiplayer socket
   useEffect(() => {
     if (isAI) return;
-    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-    const socket = io(apiUrl, {
+    const socket = io(getApiUrl(), {
       path: "/socket.io",
       transports: ["websocket", "polling"],
     });

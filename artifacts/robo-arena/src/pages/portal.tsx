@@ -17,7 +17,6 @@ export function useMockDB() {
 
 export default function Portal() {
   const [, setLocation] = useLocation();
-  const { loadDB, saveDB } = useMockDB();
   const [name, setName] = useState("");
   const [usn, setUsn] = useState("");
   const [branch, setBranch] = useState("");

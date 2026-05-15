@@ -3,7 +3,8 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
-import { useMockDB } from "./portal";
+import { io, Socket } from "socket.io-client";
+import { getApiUrl } from "@/lib/api-url";
 
 interface StoredRobot {
   playerName: string;
@@ -13,8 +14,6 @@ interface StoredRobot {
   defenseColor: string;
   stats: { armor: number; power: number; speed: number; energy: number };
 }
-
-import { io, Socket } from "socket.io-client";
 
 export default function Play() {
   const [, setLocation] = useLocation();
@@ -29,15 +28,16 @@ export default function Play() {
     const saved = localStorage.getItem("roboArena_robot");
     if (saved) setMyRobot(JSON.parse(saved));
 
-    // Initialize socket connection
-    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-    const socket = io(apiUrl, {
+    // Initialize socket connection using centralized URL
+    const socket = io(getApiUrl(), {
       path: "/socket.io",
       transports: ["websocket", "polling"]
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => console.log("[Play] Socket connected"));
+    socket.on("connect", () => console.log("[Play] Socket connected, id:", socket.id));
+    socket.on("connect_error", (err) => console.error("[Play] Socket connect_error:", err.message));
+    socket.on("disconnect", (reason) => console.warn("[Play] Socket disconnected:", reason));
     socket.on("matchmakingStatusChanged", ({ active }) => {
       console.log("[Play] Matchmaking status changed:", active);
       if (active) {

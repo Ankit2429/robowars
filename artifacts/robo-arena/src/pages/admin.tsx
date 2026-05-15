@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
+import { getApiUrl } from "@/lib/api-url";
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,8 +24,7 @@ export default function Admin() {
     if (isAuthenticated) {
       refreshData();
       
-      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-      const socket = io(apiUrl, {
+      const socket = io(getApiUrl(), {
         path: "/socket.io",
         transports: ["websocket", "polling"]
       });
