@@ -32,7 +32,21 @@ app.use(express.urlencoded({ extended: true }));
 import path from "path";
 import fs from "fs";
 
+// Debug endpoint — bypasses the router entirely
+app.get("/api/debug/ping", (_req, res) => {
+  res.json({ ok: true, cwd: process.cwd(), dirname: __dirname, node: process.version, pid: process.pid });
+});
+
 app.use("/api", router);
+
+// ── Global error handler for API routes ──
+// Express 5 requires 4-argument error handler signature
+app.use((err: any, _req: any, res: any, _next: any) => {
+  logger.error({ err: err?.message, stack: err?.stack }, "Unhandled API error");
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error", message: err?.message ?? "Unknown" });
+  }
+});
 
 // ── Serve the frontend production build ──────────────────────────────────────
 // The Vite build outputs to artifacts/robo-arena/dist/public.
