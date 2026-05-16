@@ -29,7 +29,7 @@ export default function Home() {
           <span className="text-red">DESTROY.</span>
         </p>
 
-        <Link href="/portal">
+        <Link href="/play">
           <button className="hero-btn cyber-btn">
             ENTER ARENA
             <span className="btn-glitch"></span>
