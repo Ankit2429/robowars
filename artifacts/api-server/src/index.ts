@@ -217,7 +217,6 @@ async function ensureSchema() {
   for (const table of tables) {
     try {
       if (usePostgres) {
-        // postgres.js uses tagged templates
         await client.unsafe(table.sql);
       } else {
         await client.query(table.sql);
@@ -227,7 +226,46 @@ async function ensureSchema() {
       logger.error({ table: table.name, err: err.message, stack: err.stack }, "FAILED to create table");
     }
   }
+
+  // ── Column migrations: add new columns to existing tables ──────────────────
+  // ALTER TABLE ADD COLUMN IF NOT EXISTS is idempotent — safe to run every boot
+  const migrations = [
+    {
+      desc: "tournaments.active_match_id",
+      sql: `ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS active_match_id INTEGER`,
+    },
+    {
+      desc: "tournaments.winner_id",
+      sql: `ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id INTEGER`,
+    },
+    {
+      desc: "tournament_matches.winner_id",
+      sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS winner_id INTEGER`,
+    },
+    {
+      desc: "tournament_matches.winner_name",
+      sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS winner_name TEXT`,
+    },
+    {
+      desc: "tournament_matches.is_bye",
+      sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS is_bye BOOLEAN NOT NULL DEFAULT false`,
+    },
+  ];
+
+  for (const m of migrations) {
+    try {
+      if (usePostgres) {
+        await client.unsafe(m.sql);
+      } else {
+        await client.query(m.sql);
+      }
+      logger.info({ migration: m.desc }, "Migration applied");
+    } catch (err: any) {
+      logger.warn({ migration: m.desc, err: err.message }, "Migration skipped (may already exist)");
+    }
+  }
 }
+
 
 
 boot();

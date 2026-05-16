@@ -335,8 +335,41 @@ export default function Admin() {
               )}
 
               {activeTab === "bracket" && (
-                <TournamentBracket registeredPlayers={players.map(p => ({ name: p.name, usn: p.usn }))} />
+                <div className="space-y-6">
+                  {/* Matchmaking Control Bar */}
+                  <div className="flex items-center justify-between px-5 py-4 bg-white/[0.03] border border-white/10 rounded-xl">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Matchmaking</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${matchmakingActive ? 'bg-green-500 animate-pulse' : 'bg-white/20'}`} />
+                          <span className="font-mono text-xs text-white">{matchmakingActive ? 'ACTIVE' : 'HALTED'}</span>
+                        </div>
+                      </div>
+                      <div className="h-8 w-px bg-white/10" />
+                      <div>
+                        <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Queue</p>
+                        <span className="text-primary font-black text-lg leading-none">{queueCount}</span>
+                        <span className="font-mono text-[9px] text-muted-foreground ml-1">pilots waiting</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={toggleMatchmaking}
+                      className={`flex items-center gap-2 px-6 py-2.5 rounded font-mono text-[10px] uppercase tracking-widest transition-all border font-bold ${
+                        matchmakingActive
+                          ? 'bg-red-500/10 border-red-500/60 text-red-400 hover:bg-red-500 hover:text-white'
+                          : 'bg-green-500/10 border-green-500/60 text-green-400 hover:bg-green-500 hover:text-white'
+                      }`}
+                    >
+                      <Square className="h-3 w-3" />
+                      {matchmakingActive ? 'Halt Matchmaking' : 'Start Matchmaking'}
+                    </button>
+                  </div>
+
+                  <TournamentBracket registeredPlayers={players.map(p => ({ name: p.name, usn: p.usn }))} />
+                </div>
               )}
+
             </motion.div>
           </AnimatePresence>
         </main>
