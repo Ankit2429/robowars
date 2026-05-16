@@ -13,6 +13,7 @@ import Builder from "@/pages/builder";
 import Play from "@/pages/play";
 import Battle from "@/pages/battle";
 import Leaderboard from "@/pages/leaderboard";
+import Registration from "@/pages/registration";
 import Admin from "@/pages/admin";
 
 const queryClient = new QueryClient({
@@ -28,6 +29,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/register" component={Registration} />
       <Route path="/admin" component={Admin} />
       <Route path="/builder" component={Builder} />
       <Route path="/play" component={Play} />

@@ -12,7 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  const hideHeader = location === "/" || location === "/admin";
+  const hideHeader = location === "/" || location === "/admin" || location === "/register";
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground overflow-x-hidden">
