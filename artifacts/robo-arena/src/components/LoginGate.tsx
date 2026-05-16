@@ -207,15 +207,15 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       </motion.div>
 
       {/* Admin Portal Access */}
-      <div className="absolute bottom-6 right-6 z-20">
+      <div className="absolute bottom-8 right-8 z-20">
         <a 
           href="/admin" 
-          className="opacity-20 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-1 group scale-75 origin-bottom-right"
+          className="opacity-50 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-2 group scale-90 origin-bottom-right"
         >
-          <div className="p-2 border border-primary/30 rounded bg-primary/5 group-hover:bg-primary/10 group-hover:border-primary/60 group-hover:shadow-[0_0_10px_rgba(255,69,0,0.3)]">
-            <Sword className="h-4 w-4 text-primary" />
+          <div className="p-2.5 border border-primary/40 rounded-lg bg-primary/10 group-hover:bg-primary/20 group-hover:border-primary/80 group-hover:shadow-[0_0_15px_rgba(255,69,0,0.4)] transition-all">
+            <Sword className="h-5 w-5 text-primary" />
           </div>
-          <span className="font-mono text-[8px] text-primary/50 uppercase tracking-tighter group-hover:text-primary">ADMIN PORTAL</span>
+          <span className="font-mono text-[10px] text-primary/70 uppercase tracking-[0.2em] font-bold group-hover:text-primary transition-colors">ADMIN PORTAL</span>
         </a>
       </div>
     </div>
