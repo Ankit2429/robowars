@@ -69,6 +69,19 @@ export default function Admin() {
     }
   };
 
+  const handleClearRoster = async () => {
+    if (!confirm("⚠️ DANGER: This will permanently delete ALL registered pilots from Supabase. This cannot be undone. Proceed?")) return;
+    setIsLoading(true);
+    try {
+      await customFetch("/api/players/clear", { method: "DELETE" });
+      setPlayers([]);
+    } catch (err) {
+      console.error("[Admin] Failed to clear roster:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (authKey === "admin321") {
@@ -267,13 +280,22 @@ export default function Admin() {
                       <h2 className="text-2xl font-black uppercase tracking-widest">Pilot Roster</h2>
                       <p className="font-mono text-xs text-muted-foreground uppercase mt-1">Authorized Combatants Listing</p>
                     </div>
-                    <button 
-                      onClick={refreshData}
-                      disabled={isLoading}
-                      className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all rounded font-mono text-[10px] uppercase tracking-widest disabled:opacity-50"
-                    >
-                      <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} /> {isLoading ? 'Syncing...' : 'Refresh List'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleClearRoster}
+                        disabled={isLoading || players.length === 0}
+                        className="flex items-center gap-2 px-6 py-3 bg-red-500/10 border border-red-500/40 hover:border-red-500 hover:bg-red-500/20 transition-all rounded font-mono text-[10px] uppercase tracking-widest text-red-400 hover:text-red-300 disabled:opacity-30"
+                      >
+                        <RefreshCw className="h-3 w-3" /> Clear All Pilots
+                      </button>
+                      <button 
+                        onClick={refreshData}
+                        disabled={isLoading}
+                        className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all rounded font-mono text-[10px] uppercase tracking-widest disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} /> {isLoading ? 'Syncing...' : 'Refresh List'}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="overflow-hidden border border-white/5 rounded-xl">

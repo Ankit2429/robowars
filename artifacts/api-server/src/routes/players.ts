@@ -90,5 +90,18 @@ router.get("/players", async (req, res) => {
     res.status(500).json({ error: "Failed to list players", detail: err.message });
   }
 });
+// ── DELETE /api/players/clear — wipe ALL players ──────────────────────────────
+router.delete("/players/clear", async (req, res) => {
+  try {
+    await waitForDB();
+    req.log.warn("CLEARING all players from database — admin request");
+    await db.delete(playersTable);
+    req.log.info("All players cleared successfully");
+    res.json({ success: true, message: "All players cleared" });
+  } catch (err: any) {
+    req.log.error({ err: err.message, stack: err.stack }, "FAILED to clear players");
+    res.status(500).json({ error: "Failed to clear players", detail: err.message });
+  }
+});
 
 export default router;
