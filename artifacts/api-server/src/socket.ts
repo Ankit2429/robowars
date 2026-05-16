@@ -20,10 +20,12 @@ interface QueueEntry {
   socketId: string;
   playerName: string;
   robotId?: number;
+  queuedAt: number;
 }
 
 const rooms = new Map<string, { players: Player[]; status: string }>();
 const matchQueue: QueueEntry[] = [];
+let matchmakingInterval: NodeJS.Timeout | null = null;
 
 // ── Exported accessors for debug API ────────────────────────────────────────
 let _io: SocketIOServer | null = null;
@@ -62,6 +64,8 @@ export function getDebugState() {
     roomCount: rooms.size,
   };
 }
+
+import { generateBracket } from "./lib/bracket";
 
 // ── Setup ───────────────────────────────────────────────────────────────────
 export function setupSocketIO(server: HttpServer) {
@@ -148,6 +152,58 @@ export function setupSocketIO(server: HttpServer) {
     // Send immediate debug state to new connection
     socket.emit("debugState", getDebugState());
 
+    // ── Matchmaking Loop ─────────────────────────────────────────────────────
+    if (!matchmakingInterval) {
+      matchmakingInterval = setInterval(() => {
+        if (matchQueue.length === 0) return;
+
+        // Try pairing real players first
+        while (matchQueue.length >= 2) {
+          const p1 = matchQueue.shift()!;
+          const p2 = matchQueue.shift()!;
+          startRoomMatch(p1, p2);
+        }
+
+        // Handle AI Fallback for the remaining player (if any)
+        if (matchQueue.length === 1) {
+          const p1 = matchQueue[0];
+          const waitingTime = Date.now() - p1.queuedAt;
+          if (waitingTime > 15000) {
+            logger.info({ playerName: p1.playerName, waitingTime }, "AI Fallback triggered");
+            matchQueue.shift(); // Remove from queue
+            const bot: QueueEntry = {
+              socketId: "bot_" + Math.random().toString(36).slice(2, 7),
+              playerName: "AI_" + Math.floor(Math.random() * 9999),
+              queuedAt: Date.now()
+            };
+            startRoomMatch(p1, bot);
+          }
+        }
+      }, 3000);
+    }
+
+    // Helper to start match
+    const startRoomMatch = (p1: QueueEntry, p2: QueueEntry) => {
+      const roomId = `match_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      logger.info({ p1: p1.playerName, p2: p2.playerName, roomId }, "MATCH FOUND");
+
+      rooms.set(roomId, { players: [], status: "waiting" });
+
+      if (!p1.socketId.startsWith("bot_")) io.to(p1.socketId).emit("matchFound", { roomId, opponentName: p2.playerName, side: "p1" });
+      if (!p2.socketId.startsWith("bot_")) io.to(p2.socketId).emit("matchFound", { roomId, opponentName: p1.playerName, side: "p2" });
+
+      broadcastDebug();
+
+      db.insert(roomsTable).values({
+        id: roomId,
+        name: `Match: ${p1.playerName} vs ${p2.playerName}`,
+        hostName: p1.playerName,
+        status: "waiting",
+        playerCount: 0,
+        maxPlayers: 2,
+      }).catch((err: any) => logger.error({ err }, "Failed to insert match room into DB"));
+    };
+
     // ── Matchmaking ──────────────────────────────────────────────────────────
     socket.on("findMatch", ({ playerName, robotId }: { playerName: string; robotId?: number }) => {
       logger.info({ socketId: socket.id, playerName, robotId, currentQueueLength: matchQueue.length }, "findMatch received");
@@ -155,52 +211,48 @@ export function setupSocketIO(server: HttpServer) {
       // Remove any existing entry for this socket
       const existingIdx = matchQueue.findIndex(p => p.socketId === socket.id);
       if (existingIdx !== -1) {
-        logger.info({ socketId: socket.id }, "Removed duplicate queue entry");
         matchQueue.splice(existingIdx, 1);
       }
 
-      matchQueue.push({ socketId: socket.id, playerName, robotId });
+      matchQueue.push({ socketId: socket.id, playerName, robotId, queuedAt: Date.now() });
       socket.data.inQueue = true;
       socket.data.playerName = playerName;
 
-      logger.info({
-        playerName,
-        queueLength: matchQueue.length,
-        queueContents: matchQueue.map(q => q.playerName),
-      }, "Player ADDED to matchQueue");
-
       broadcastDebug();
 
-      if (matchQueue.length >= 2) {
-        const p1 = matchQueue.shift()!;
-        const p2 = matchQueue.shift()!;
-        const roomId = `match_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      // Emit searching immediately; loop will handle pairing
+      socket.emit("matchSearching");
+    });
 
-        logger.info({
-          p1: p1.playerName, p1Socket: p1.socketId,
-          p2: p2.playerName, p2Socket: p2.socketId,
-          roomId,
-        }, "MATCH FOUND — pairing two players");
+    // ── Tournament Bracket Logic ──────────────────────────────────────────────
+    socket.on("generateBracket", () => {
+      logger.info({ queueLength: matchQueue.length }, "Admin initiated bracket generation");
+      
+      const socketIds = matchQueue.map(q => q.socketId);
+      const { matches, byes } = generateBracket(socketIds);
 
-        rooms.set(roomId, { players: [], status: "waiting" });
+      // Handle BYEs
+      byes.forEach(socketId => {
+        io.to(socketId).emit("byeReceived");
+        // Remove from queue
+        const idx = matchQueue.findIndex(q => q.socketId === socketId);
+        if (idx !== -1) matchQueue.splice(idx, 1);
+      });
 
-        io.to(p1.socketId).emit("matchFound", { roomId, opponentName: p2.playerName, side: "p1" });
-        io.to(p2.socketId).emit("matchFound", { roomId, opponentName: p1.playerName, side: "p2" });
+      // Handle Matches
+      matches.forEach(match => {
+        const p1Idx = matchQueue.findIndex(q => q.socketId === match.p1);
+        const p1 = matchQueue[p1Idx];
+        if (p1Idx !== -1) matchQueue.splice(p1Idx, 1);
 
-        broadcastDebug();
+        const p2Idx = matchQueue.findIndex(q => q.socketId === match.p2);
+        const p2 = matchQueue[p2Idx];
+        if (p2Idx !== -1) matchQueue.splice(p2Idx, 1);
 
-        db.insert(roomsTable).values({
-          id: roomId,
-          name: `Match: ${p1.playerName} vs ${p2.playerName}`,
-          hostName: p1.playerName,
-          status: "waiting",
-          playerCount: 0,
-          maxPlayers: 2,
-        }).catch((err: any) => logger.error({ err }, "Failed to insert match room into DB"));
-      } else {
-        logger.info({ playerName, queueLength: matchQueue.length }, "Waiting for opponent — emitting matchSearching");
-        socket.emit("matchSearching");
-      }
+        if (p1 && p2) startRoomMatch(p1, p2);
+      });
+
+      broadcastDebug();
     });
 
     socket.on("cancelMatch", () => {

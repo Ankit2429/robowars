@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock } from "lucide-react";
+import { Cpu, Wifi, WifiOff, Swords, Bot, Loader2, X, Lock, Trophy } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
 import { getApiUrl } from "@/lib/api-url";
@@ -19,7 +19,7 @@ interface StoredRobot {
 export default function Play() {
   const [, setLocation] = useLocation();
   const [myRobot, setMyRobot] = useState<StoredRobot | null>(null);
-  const [matchState, setMatchState] = useState<"idle" | "awaiting_admin" | "searching" | "found">("idle");
+  const [matchState, setMatchState] = useState<"idle" | "awaiting_admin" | "searching" | "found" | "bye">("idle");
   const [searchTime, setSearchTime] = useState(0);
   const [found, setFound] = useState<{ opponentName: string; roomId: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -87,6 +87,15 @@ export default function Play() {
 
     socket.on("matchSearching", () => {
       console.log("[Play] matchSearching acknowledged — waiting in queue");
+    });
+
+    socket.on("byeReceived", () => {
+      console.log("[Play] BYE received!");
+      setMatchState("bye");
+      // Could automatically transition to waiting for next round here
+      setTimeout(() => {
+        setMatchState("idle");
+      }, 5000);
     });
 
     return () => {
@@ -253,6 +262,16 @@ export default function Play() {
                   </div>
                   <p className="font-mono text-primary text-sm animate-pulse">ENTERING ARENA...</p>
                 </>
+              ) : matchState === "bye" ? (
+                <>
+                  <div className="relative mb-2">
+                    <Trophy className="h-16 w-16 text-green-500 animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display text-2xl text-green-500 font-bold tracking-widest uppercase">BYE ADVANTAGE</p>
+                  </div>
+                  <p className="font-mono text-xs text-green-500/80 text-center uppercase tracking-widest">You automatically advance<br/>to the next round</p>
+                </>
               ) : matchState === "awaiting_admin" ? (
                 <>
                   <div className="relative mb-2">
@@ -278,7 +297,7 @@ export default function Play() {
                       {Math.floor(searchTime / 60).toString().padStart(2,"0")}:{(searchTime % 60).toString().padStart(2,"0")}
                     </p>
                   </div>
-                  <p className="font-mono text-xs text-muted-foreground text-center">Waiting for a real opponent...<br/>No AI fallback — real players only.</p>
+                  <p className="font-mono text-xs text-muted-foreground text-center">Waiting for opponent...<br/>AI Fallback activates after 15s.</p>
                   <button onClick={handleCancel} className="brutal-button px-6 py-2 text-sm flex items-center gap-2 mt-4">
                     <X className="h-4 w-4" /> CANCEL
                   </button>

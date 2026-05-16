@@ -121,6 +121,12 @@ export default function Admin() {
     }
   };
 
+  const handleGenerateBracket = () => {
+    if (socketRef.current) {
+      socketRef.current.emit("generateBracket");
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden">
@@ -343,8 +349,18 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl flex items-center justify-center opacity-30 italic">
-                      <p className="font-mono text-[10px] uppercase tracking-widest">Advanced Bracket Visualizer Offline</p>
+                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl flex flex-col gap-4">
+                      <h3 className="font-bold uppercase tracking-widest text-sm border-b border-white/5 pb-2">Bracket Generation</h3>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        This action will evaluate the queue, assign BYEs to balance the bracket, and match remaining players instantly.
+                      </p>
+                      <button 
+                        onClick={handleGenerateBracket}
+                        disabled={queueCount === 0}
+                        className="mt-auto brutal-button px-6 py-3 w-full border-primary text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-30 flex justify-center items-center gap-2"
+                      >
+                        <Trophy className="w-4 h-4" /> GENERATE BRACKET & MATCH
+                      </button>
                     </div>
                   </div>
                 </div>
