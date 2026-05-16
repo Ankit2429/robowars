@@ -61,6 +61,7 @@ export const tournamentMatchesTable = pgTable("tournament_matches", {
   player2Name: text("player2_name"),
   player1RobotName: text("player1_robot_name"),
   player2RobotName: text("player2_robot_name"),
+  side: text("side").notNull().default("L"), // L | R | F
   winnerId: integer("winner_id"),
   winnerName: text("winner_name"),
   isBye: boolean("is_bye").notNull().default(false),

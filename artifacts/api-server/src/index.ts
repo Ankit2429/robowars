@@ -250,7 +250,12 @@ async function ensureSchema() {
       desc: "tournament_matches.is_bye",
       sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS is_bye BOOLEAN NOT NULL DEFAULT false`,
     },
+    {
+      desc: "tournament_matches.side",
+      sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS side TEXT NOT NULL DEFAULT 'L'`,
+    },
   ];
+
 
   for (const m of migrations) {
     try {

@@ -7,7 +7,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
 
   // Public routes that don't require registration
-  const publicRoutes = ["/", "/admin", "/register", "/cast"];
+  const publicRoutes = ["/", "/admin", "/register"];
   if (publicRoutes.includes(location)) {
     return <>{children}</>;
   }

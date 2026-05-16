@@ -15,7 +15,7 @@ import Battle from "@/pages/battle";
 import Leaderboard from "@/pages/leaderboard";
 import Registration from "@/pages/registration";
 import Admin from "@/pages/admin";
-import CastPage from "@/pages/cast";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,7 +36,6 @@ function Router() {
       <Route path="/play" component={Play} />
       <Route path="/battle/:roomId" component={Battle} />
       <Route path="/leaderboard" component={Leaderboard} />
-      <Route path="/cast" component={CastPage} />
 
       <Route component={NotFound} />
     </Switch>

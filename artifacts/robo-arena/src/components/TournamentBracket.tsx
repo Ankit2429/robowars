@@ -1,211 +1,185 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "wouter";
-import { Trophy, Swords, Play, RotateCcw, ChevronRight, Zap, Crown, Shield } from "lucide-react";
+import { Trophy, Swords, Play, RotateCcw, Crown, Zap, Shield } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
 import { getApiUrl } from "@/lib/api-url";
 
-interface TPlayer {
-  id: number;
-  tournamentId: number;
-  pilotName: string;
-  robotName: string;
-  seed: number;
-  status: string;
-}
-
+// ── Types ────────────────────────────────────────────────────────────────────
+interface TPlayer { id: number; tournamentId: number; pilotName: string; robotName: string; seed: number; status: string; }
 interface TMatch {
-  id: number;
-  tournamentId: number;
-  roundId: number;
-  roundNumber: number;
-  matchNumber: number;
-  player1Id: number | null;
-  player2Id: number | null;
-  player1Name: string | null;
-  player2Name: string | null;
-  player1RobotName: string | null;
-  player2RobotName: string | null;
-  winnerId: number | null;
-  winnerName: string | null;
-  isBye: boolean;
-  status: string;
+  id: number; tournamentId: number; roundId: number; roundNumber: number;
+  matchNumber: number; side: string;
+  player1Id: number | null; player2Id: number | null;
+  player1Name: string | null; player2Name: string | null;
+  player1RobotName: string | null; player2RobotName: string | null;
+  winnerId: number | null; winnerName: string | null;
+  isBye: boolean; status: string;
+}
+interface TRound { id: number; tournamentId: number; roundNumber: number; status: string; }
+interface Tournament { id: number; name: string; status: string; currentRound: number; totalRounds: number; winnerId: number | null; activeMatchId: number | null; }
+interface TournamentState { tournament: Tournament | null; players: TPlayer[]; rounds: TRound[]; matches: TMatch[]; }
+interface Props { registeredPlayers: Array<{ name: string; usn: string }>; }
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const CARD_W = 188;
+const CARD_H = 72;
+const BASE_UNIT = CARD_H + 16; // slot height for round 1
+
+function slotHeight(round: number) { return Math.pow(2, round - 1) * BASE_UNIT; }
+function matchTop(round: number, idx: number) {
+  const sh = slotHeight(round);
+  return idx * sh + (sh - CARD_H) / 2;
 }
 
-interface TRound {
-  id: number;
-  tournamentId: number;
-  roundNumber: number;
-  status: string;
-}
-
-interface Tournament {
-  id: number;
-  name: string;
-  status: string;
-  currentRound: number;
-  totalRounds: number;
-  winnerId: number | null;
-  activeMatchId: number | null;
-}
-
-interface TournamentState {
-  tournament: Tournament | null;
-  players: TPlayer[];
-  rounds: TRound[];
-  matches: TMatch[];
-}
-
-interface Props {
-  registeredPlayers: Array<{ name: string; usn: string }>;
-}
-
-const ROUND_NAMES = ["", "Round of 64", "Round of 32", "Round of 16", "Quarterfinals", "Semifinals", "Grand Final", "Champion"];
-
-function getRoundLabel(roundNum: number, totalRounds: number): string {
-  const fromEnd = totalRounds - roundNum + 1;
-  if (fromEnd === 1) return "🏆 Grand Final";
-  if (fromEnd === 2) return "Semifinals";
-  if (fromEnd === 3) return "Quarterfinals";
-  return `Round ${roundNum}`;
-}
-
+// ── Match Card ───────────────────────────────────────────────────────────────
 function MatchCard({
-  match,
-  isActive,
-  onDeclareWinner,
-  onSetCast,
-  canDeclare,
-  isCasting,
+  match, isCurrentRound, onWin, isFinal,
 }: {
-  match: TMatch;
-  isActive: boolean;
-  onDeclareWinner: (matchId: number, winnerId: number, winnerName: string) => void;
-  onSetCast: (matchId: number | null) => void;
-  canDeclare: boolean;
-  isCasting: boolean;
+  match: TMatch | null; isCurrentRound: boolean; onWin?: (matchId: number, wId: number, wName: string) => void; isFinal?: boolean;
 }) {
+  if (!match) {
+    return (
+      <div
+        style={{ width: CARD_W, height: CARD_H }}
+        className="rounded-lg border border-dashed border-white/10 bg-black/20 flex items-center justify-center"
+      >
+        <span className="font-mono text-[9px] text-white/20 uppercase tracking-widest">TBD</span>
+      </div>
+    );
+  }
+
   const isFinished = match.status === "finished";
   const isBye = match.isBye;
+
+  if (isBye) {
+    return (
+      <div style={{ width: CARD_W, height: CARD_H }} className="rounded-lg border border-green-500/20 bg-green-950/30 flex flex-col justify-center px-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Zap className="w-3 h-3 text-green-400" />
+          <span className="font-mono text-[8px] text-green-400 uppercase tracking-widest">BYE — Auto Advance</span>
+        </div>
+        <p className="font-display font-bold text-sm text-white truncate">{match.player1Name}</p>
+        <p className="font-mono text-[9px] text-white/40 truncate">{match.player1RobotName}</p>
+      </div>
+    );
+  }
+
+  const p1Win = isFinished && match.winnerId === match.player1Id;
+  const p2Win = isFinished && match.winnerId === match.player2Id;
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.88 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className={`relative rounded-xl border overflow-hidden transition-all duration-500 ${
-        isActive
-          ? "border-primary/70 shadow-[0_0_30px_rgba(255,69,0,0.25)] bg-gradient-to-b from-primary/10 to-black/60"
+      style={{ width: CARD_W, height: CARD_H }}
+      className={`relative rounded-lg border overflow-hidden flex flex-col ${
+        isFinal
+          ? "border-yellow-500/50 bg-gradient-to-b from-yellow-950/40 to-black/60 shadow-[0_0_20px_rgba(234,179,8,0.15)]"
+          : isCurrentRound && !isFinished
+          ? "border-primary/60 bg-gradient-to-b from-primary/10 to-black/60 shadow-[0_0_15px_rgba(255,69,0,0.2)]"
           : isFinished
           ? "border-white/10 bg-black/40"
           : "border-white/[0.07] bg-black/20"
       }`}
     >
-      {isActive && (
-        <motion.div
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary"
-        />
+      {/* Active pulse */}
+      {isCurrentRound && !isFinished && (
+        <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2, repeat: Infinity }} className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
       )}
 
-      {isBye ? (
-        <div className="p-3">
-          <div className="flex items-center gap-2 px-2 py-2 rounded bg-green-500/10 border border-green-500/20">
-            <Zap className="h-3 w-3 text-green-400 shrink-0" />
-            <div>
-              <p className="font-mono text-[9px] text-green-400 uppercase tracking-widest">BYE — Auto Advance</p>
-              <p className="font-display text-sm font-bold text-white mt-0.5">{match.player1Name}</p>
-              <p className="font-mono text-[10px] text-white/50">{match.player1RobotName}</p>
-            </div>
-          </div>
+      {/* Player 1 */}
+      <div className={`flex-1 flex items-center gap-1.5 px-2.5 border-b border-white/5 ${p2Win ? "opacity-30" : ""}`}>
+        {p1Win && <Crown className="w-2.5 h-2.5 text-yellow-400 shrink-0" />}
+        <div className="flex-1 min-w-0">
+          <p className={`font-display font-bold text-[12px] truncate leading-tight ${p1Win ? "text-yellow-300" : "text-white"}`}>{match.player1Name || "TBD"}</p>
+          <p className="font-mono text-[8px] text-white/30 truncate">{match.player1RobotName || "—"}</p>
         </div>
-      ) : (
-        <div className="p-3 space-y-1.5">
-          {/* Player 1 */}
-          <motion.div
-            animate={match.winnerId === match.player1Id ? { boxShadow: ["0 0 0px rgba(255,200,0,0)", "0 0 15px rgba(255,200,0,0.3)", "0 0 0px rgba(255,200,0,0)"] } : {}}
-            transition={{ duration: 2, repeat: Infinity }}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all duration-300 ${
-              match.winnerId === match.player1Id
-                ? "border-yellow-500/50 bg-yellow-500/10"
-                : match.winnerId && match.winnerId !== match.player1Id
-                ? "border-white/5 bg-white/[0.02] opacity-40"
-                : "border-white/10 bg-white/[0.04]"
-            }`}
-          >
-            {match.winnerId === match.player1Id && <Crown className="h-3 w-3 text-yellow-400 shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <p className="font-display font-bold text-[13px] text-white truncate leading-tight">
-                {match.player1Name || "TBD"}
-              </p>
-              <p className="font-mono text-[9px] text-white/40 uppercase tracking-wider truncate">
-                {match.player1RobotName || "—"}
-              </p>
-            </div>
-            {canDeclare && !isFinished && match.player1Id && (
-              <div className="flex gap-1">
-                <button
-                  onClick={() => onSetCast(isCasting ? null : match.id)}
-                  className={`shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border transition-all rounded ${isCasting ? 'bg-primary border-primary text-black' : 'border-primary/40 text-primary hover:bg-primary/20'}`}
-                >
-                  {isCasting ? 'CASTING' : 'CAST'}
-                </button>
-                <button
-                  onClick={() => onDeclareWinner(match.id, match.player1Id!, match.player1Name!)}
-                  className="shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded"
-                >
-                  WIN
-                </button>
-              </div>
-            )}
-          </motion.div>
+        {onWin && isCurrentRound && !isFinished && match.player1Id && (
+          <button onClick={() => onWin(match.id, match.player1Id!, match.player1Name!)} className="shrink-0 text-[8px] font-mono uppercase px-1.5 py-0.5 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded">W</button>
+        )}
+      </div>
 
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex-1 h-px bg-white/5" />
-            <Swords className="h-3 w-3 text-white/20" />
-            <div className="flex-1 h-px bg-white/5" />
-          </div>
-
-          {/* Player 2 */}
-          <motion.div
-            animate={match.winnerId === match.player2Id ? { boxShadow: ["0 0 0px rgba(255,200,0,0)", "0 0 15px rgba(255,200,0,0.3)", "0 0 0px rgba(255,200,0,0)"] } : {}}
-            transition={{ duration: 2, repeat: Infinity }}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all duration-300 ${
-              match.winnerId === match.player2Id
-                ? "border-yellow-500/50 bg-yellow-500/10"
-                : match.winnerId && match.winnerId !== match.player2Id
-                ? "border-white/5 bg-white/[0.02] opacity-40"
-                : "border-white/10 bg-white/[0.04]"
-            }`}
-          >
-            {match.winnerId === match.player2Id && <Crown className="h-3 w-3 text-yellow-400 shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <p className="font-display font-bold text-[13px] text-white truncate leading-tight">
-                {match.player2Name || "TBD"}
-              </p>
-              <p className="font-mono text-[9px] text-white/40 uppercase tracking-wider truncate">
-                {match.player2RobotName || "—"}
-              </p>
-            </div>
-            {canDeclare && !isFinished && match.player2Id && (
-              <button
-                onClick={() => onDeclareWinner(match.id, match.player2Id!, match.player2Name!)}
-                className="shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded"
-              >
-                WIN
-              </button>
-            )}
-          </motion.div>
+      {/* Player 2 */}
+      <div className={`flex-1 flex items-center gap-1.5 px-2.5 ${p1Win ? "opacity-30" : ""}`}>
+        {p2Win && <Crown className="w-2.5 h-2.5 text-yellow-400 shrink-0" />}
+        <div className="flex-1 min-w-0">
+          <p className={`font-display font-bold text-[12px] truncate leading-tight ${p2Win ? "text-yellow-300" : "text-white"}`}>{match.player2Name || "TBD"}</p>
+          <p className="font-mono text-[8px] text-white/30 truncate">{match.player2RobotName || "—"}</p>
         </div>
-      )}
+        {onWin && isCurrentRound && !isFinished && match.player2Id && (
+          <button onClick={() => onWin(match.id, match.player2Id!, match.player2Name!)} className="shrink-0 text-[8px] font-mono uppercase px-1.5 py-0.5 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded">W</button>
+        )}
+      </div>
     </motion.div>
   );
 }
 
+// ── Bracket Column ───────────────────────────────────────────────────────────
+function BracketColumn({
+  round, matches, totalMatchesInRound1PerSide, currentRound, onWin, isFinal, reversed,
+}: {
+  round: number; matches: TMatch[]; totalMatchesInRound1PerSide: number;
+  currentRound: number; onWin: (matchId: number, wId: number, wName: string) => void;
+  isFinal?: boolean; reversed?: boolean;
+}) {
+  const matchCount = totalMatchesInRound1PerSide / Math.pow(2, round - 1);
+  const colHeight = totalMatchesInRound1PerSide * BASE_UNIT;
+
+  return (
+    <div className="relative flex-shrink-0" style={{ width: CARD_W, height: colHeight }}>
+      {Array.from({ length: Math.max(matchCount, 0) }).map((_, idx) => {
+        const match = matches[idx] || null;
+        const top = matchTop(round, idx);
+        const midY = top + CARD_H / 2;
+        const nextSlotH = slotHeight(round + 1);
+        const isTopOfPair = idx % 2 === 0;
+        const pairPartnerTop = isTopOfPair ? matchTop(round, idx + 1) + CARD_H / 2 : matchTop(round, idx - 1) + CARD_H / 2;
+        const connY1 = Math.min(midY, pairPartnerTop);
+        const connY2 = Math.max(midY, pairPartnerTop);
+        const connMidY = (connY1 + connY2) / 2;
+        const hasNext = round < (isFinal ? round : round + 1) && matchCount > 1;
+
+        return (
+          <div key={idx} className="absolute" style={{ top, left: 0 }}>
+            <MatchCard match={match} isCurrentRound={round === currentRound} onWin={onWin} isFinal={isFinal} />
+
+            {/* Horizontal connector OUT (right for left-side, left for right-side) */}
+            {!isFinal && matchCount > 1 && (
+              <motion.div
+                animate={match?.winnerId ? { opacity: [0.3, 0.8, 0.3] } : { opacity: 0.15 }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="absolute top-1/2 -translate-y-1/2"
+                style={{
+                  [reversed ? "right" : "left"]: CARD_W,
+                  width: 24,
+                  height: 1,
+                  background: match?.winnerId ? "rgba(255,69,0,0.6)" : "rgba(255,255,255,0.15)",
+                }}
+              />
+            )}
+
+            {/* Vertical connector (only for top of pair) */}
+            {!isFinal && matchCount > 1 && isTopOfPair && idx + 1 < matchCount && (
+              <motion.div
+                animate={{ opacity: 0.15 }}
+                className="absolute"
+                style={{
+                  [reversed ? "right" : "left"]: CARD_W + 23,
+                  top: CARD_H / 2,
+                  width: 1,
+                  height: matchTop(round, idx + 1) + CARD_H / 2 - midY,
+                  background: "rgba(255,255,255,0.15)",
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
 export function TournamentBracket({ registeredPlayers }: Props) {
   const [state, setState] = useState<TournamentState>({ tournament: null, players: [], rounds: [], matches: [] });
   const [loading, setLoading] = useState(false);
@@ -213,62 +187,39 @@ export function TournamentBracket({ registeredPlayers }: Props) {
   const [champion, setChampion] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
+  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 4000); };
+
   const loadTournament = useCallback(async () => {
     try {
-      console.log("[Tournament] Loading data...");
       const data = await customFetch<TournamentState>("/api/tournament");
-      console.log("[Tournament] Received data:", data);
       setState(data);
       if (data.tournament?.status === "finished" && data.tournament.winnerId) {
-        const winner = data.players?.find(p => p.id === data.tournament!.winnerId);
-        if (winner) setChampion(winner.pilotName);
+        const w = data.players?.find(p => p.id === data.tournament!.winnerId);
+        if (w) setChampion(w.pilotName);
+      } else {
+        setChampion(null);
       }
-    } catch (e) {
-      console.error("[Tournament] Failed to load tournament:", e);
-    }
+    } catch (e) { console.error("Failed to load tournament", e); }
   }, []);
 
   useEffect(() => {
     loadTournament();
-
-    const socket = io(getApiUrl(), {
-      path: "/socket.io",
-      transports: ["polling", "websocket"],
-      withCredentials: true,
-    });
+    const socket = io(getApiUrl(), { path: "/socket.io", transports: ["polling", "websocket"], withCredentials: true });
     socketRef.current = socket;
-
-    socket.on("bracket_updated", () => {
-      loadTournament();
-    });
-
+    socket.on("bracket_updated", loadTournament);
     return () => { socket.disconnect(); };
   }, [loadTournament]);
 
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
-
   const handleStart = async () => {
-    if (registeredPlayers.length < 2) {
-      flash("❌ Need at least 2 registered players");
-      return;
-    }
+    if (registeredPlayers.length < 2) { flash("❌ Need at least 2 registered players"); return; }
     setLoading(true);
     try {
-      const players = registeredPlayers.map(p => ({
-        pilotName: p.name,
-        robotName: "RoboWars Bot",
-      }));
-      const res = await customFetch<any>("/api/tournament/start", {
-        method: "POST",
-        body: JSON.stringify({ players }),
-      });
-      flash(`✅ Tournament started! ${res.numByes} BYE(s) assigned. ${res.totalRounds} rounds total.`);
+      const players = registeredPlayers.map(p => ({ pilotName: p.name, robotName: "RoboWars Bot" }));
+      const res = await customFetch<any>("/api/tournament/start", { method: "POST", body: JSON.stringify({ players }) });
+      flash(`✅ Tournament started! ${res.numByes} BYE(s), ${res.totalRounds} rounds.`);
       loadTournament();
-    } catch (e: any) {
-      flash(`❌ ${e.message || "Failed to start"}`);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) { flash(`❌ ${e.message}`); }
+    finally { setLoading(false); }
   };
 
   const handleReset = async () => {
@@ -279,74 +230,43 @@ export function TournamentBracket({ registeredPlayers }: Props) {
       await customFetch("/api/tournament/reset", { method: "POST", body: JSON.stringify({}) });
       flash("✅ Tournament reset");
       setState({ tournament: null, players: [], rounds: [], matches: [] });
-    } catch (e: any) {
-      flash(`❌ ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) { flash(`❌ ${e.message}`); }
+    finally { setLoading(false); }
   };
 
-  const handleAdvanceRound = async () => {
-    if (!state.tournament) return;
+  const handleWin = async (matchId: number, winnerId: number, winnerName: string) => {
     setLoading(true);
     try {
-      const res = await customFetch<any>("/api/tournament/advance-round", {
-        method: "POST",
-        body: JSON.stringify({ tournamentId: state.tournament.id }),
-      });
-      if (res.finished) {
-        setChampion(res.champion);
-        flash(`🏆 CHAMPION: ${res.champion}`);
-      } else {
-        flash(`✅ Advanced to Round ${res.nextRound}`);
-      }
+      await customFetch("/api/tournament/declare-winner", { method: "POST", body: JSON.stringify({ matchId, winnerId, winnerName }) });
+      flash(`✅ ${winnerName} advances!`);
       loadTournament();
-    } catch (e: any) {
-      flash(`❌ ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) { flash(`❌ ${e.message}`); }
+    finally { setLoading(false); }
   };
 
-  const handleSetCast = async (matchId: number | null) => {
-    if (!state.tournament) return;
-    setLoading(true);
-    try {
-      await customFetch("/api/tournament/set-active-match", {
-        method: "POST",
-        body: JSON.stringify({ tournamentId: state.tournament.id, matchId }),
-      });
-      loadTournament();
-    } catch (e: any) {
-      flash(`❌ ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeclareWinner = async (matchId: number, winnerId: number, winnerName: string) => {
-    setLoading(true);
-    try {
-      await customFetch("/api/tournament/declare-winner", {
-        method: "POST",
-        body: JSON.stringify({ matchId, winnerId, winnerName }),
-      });
-      flash(`✅ ${winnerName} declared winner`);
-      loadTournament();
-    } catch (e: any) {
-      flash(`❌ ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const { tournament, matches = [], rounds = [] } = state;
-  const allRoundNumbers = [...new Set(matches.map(m => m.roundNumber))].sort((a, b) => a - b);
+  const { tournament, matches = [], players = [] } = state;
+  const totalRounds = tournament?.totalRounds ?? 0;
   const currentRound = tournament?.currentRound ?? 0;
   const isActive = tournament?.status === "active";
 
-  const currentRoundMatches = matches.filter(m => m.roundNumber === currentRound);
-  const allCurrentFinished = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.status === "finished" || m.isBye);
+  // Compute round 1 matches per side (for layout sizing)
+  const r1LeftCount = matches.filter(m => m.roundNumber === 1 && m.side === "L").length;
+  const r1RightCount = matches.filter(m => m.roundNumber === 1 && m.side === "R").length;
+  const r1PerSide = Math.max(r1LeftCount, r1RightCount, 1);
+
+  // Group matches: leftRounds = 1..totalRounds-1 for side L, rightRounds same for R, finalRound for F
+  const leftRounds: number[] = [];
+  const rightRounds: number[] = [];
+  for (let r = 1; r < totalRounds; r++) {
+    leftRounds.push(r);
+    rightRounds.push(r);
+  }
+  const finalRound = totalRounds > 0 ? totalRounds : null;
+
+  const getMatches = (side: string, round: number) =>
+    matches.filter(m => m.side === side && m.roundNumber === round).sort((a, b) => a.matchNumber - b.matchNumber);
+
+  const colHeight = r1PerSide * BASE_UNIT;
 
   return (
     <div className="space-y-6">
@@ -357,59 +277,30 @@ export function TournamentBracket({ registeredPlayers }: Props) {
             <Trophy className="h-6 w-6 text-primary" /> Tournament Bracket
           </h2>
           <p className="font-mono text-xs text-muted-foreground uppercase mt-1">
-            {tournament
-              ? `${tournament.name} • Round ${tournament.currentRound}/${tournament.totalRounds} • ${tournament.status.toUpperCase()}`
-              : "No active tournament"}
+            {tournament ? `${tournament.name} • Round ${currentRound}/${totalRounds} • ${tournament.status.toUpperCase()}` : "No active tournament"}
           </p>
         </div>
-
         <div className="flex flex-wrap gap-2">
-          {!isActive && (
-            <button
-              onClick={handleStart}
-              disabled={loading || registeredPlayers.length < 2}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-500/10 border border-green-500 text-green-400 hover:bg-green-500 hover:text-black transition-all font-mono text-[11px] uppercase tracking-widest rounded disabled:opacity-30"
-            >
+          {!isActive && !champion && (
+            <button onClick={handleStart} disabled={loading || registeredPlayers.length < 2}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-500/10 border border-green-500 text-green-400 hover:bg-green-500 hover:text-black transition-all font-mono text-[11px] uppercase tracking-widest rounded disabled:opacity-30">
               <Play className="h-3.5 w-3.5" /> Start Tournament
             </button>
           )}
-          {isActive && allCurrentFinished && !champion && (
-            <button
-              onClick={handleAdvanceRound}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-black transition-all font-mono text-[11px] uppercase tracking-widest rounded disabled:opacity-30"
-            >
-              <ChevronRight className="h-3.5 w-3.5" /> Advance Round
-            </button>
-          )}
           {tournament && (
-            <Link href="/cast" target="_blank">
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 border border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all font-mono text-[11px] uppercase tracking-widest rounded">
-                <Zap className="h-3.5 w-3.5" /> Launch Cast Mode
-              </button>
-            </Link>
-          )}
-          {tournament && (
-            <button
-              onClick={handleReset}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white transition-all font-mono text-[11px] uppercase tracking-widest rounded disabled:opacity-30"
-            >
+            <button onClick={handleReset} disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white transition-all font-mono text-[11px] uppercase tracking-widest rounded disabled:opacity-30">
               <RotateCcw className="h-3.5 w-3.5" /> Reset
             </button>
           )}
         </div>
       </div>
 
-      {/* Flash message */}
+      {/* Flash */}
       <AnimatePresence>
         {msg && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg font-mono text-sm text-white"
-          >
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg font-mono text-sm text-white">
             {msg}
           </motion.div>
         )}
@@ -418,20 +309,11 @@ export function TournamentBracket({ registeredPlayers }: Props) {
       {/* Champion Banner */}
       <AnimatePresence>
         {champion && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative overflow-hidden p-8 border-2 border-yellow-500 rounded-2xl bg-gradient-to-r from-yellow-950/60 via-yellow-900/30 to-yellow-950/60 text-center shadow-[0_0_60px_rgba(234,179,8,0.3)]"
-          >
-            <motion.div
-              animate={{ rotate: [0, 5, -5, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="text-5xl mb-3"
-            >🏆</motion.div>
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            className="relative overflow-hidden p-8 border-2 border-yellow-500 rounded-2xl bg-gradient-to-r from-yellow-950/60 via-yellow-900/30 to-yellow-950/60 text-center shadow-[0_0_60px_rgba(234,179,8,0.3)]">
+            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 3, repeat: Infinity }} className="text-5xl mb-3">🏆</motion.div>
             <p className="font-mono text-xs text-yellow-400/70 uppercase tracking-[0.4em] mb-1">Tournament Champion</p>
-            <h3 className="font-display text-4xl font-black text-yellow-400 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]">
-              {champion}
-            </h3>
+            <h3 className="font-display text-4xl font-black text-yellow-400 uppercase tracking-widest">{champion}</h3>
           </motion.div>
         )}
       </AnimatePresence>
@@ -442,89 +324,126 @@ export function TournamentBracket({ registeredPlayers }: Props) {
           <Shield className="h-10 w-10 text-white/20 mx-auto mb-3" />
           <p className="font-mono text-sm text-muted-foreground uppercase tracking-widest">
             {registeredPlayers.length < 2
-              ? `Need ${2 - registeredPlayers.length} more registered player(s) to start`
+              ? `Need ${2 - registeredPlayers.length} more registered pilot(s) to start`
               : `${registeredPlayers.length} pilots ready — Click "Start Tournament"`}
           </p>
         </div>
       )}
 
-      {/* Bracket — horizontal scroll of rounds */}
+      {/* Bracket View */}
       {tournament && matches.length > 0 && (
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-6 min-w-max">
-            {allRoundNumbers.map(rn => {
-              const roundMatches = matches.filter(m => m.roundNumber === rn);
-              const isCurrent = rn === currentRound;
-              const label = getRoundLabel(rn, tournament.totalRounds);
+        <div className="overflow-x-auto pb-6">
+          <div className="relative flex items-start gap-0 min-w-max" style={{ height: colHeight }}>
 
+            {/* LEFT SIDE: rounds progress left→right */}
+            {leftRounds.map((round, ri) => {
+              const lMatches = getMatches("L", round);
               return (
-                <div key={rn} className="flex flex-col gap-0">
-                  {/* Round header */}
-                  <div className={`mb-3 px-3 py-1.5 rounded-lg text-center font-mono text-[10px] uppercase tracking-widest border transition-all ${
-                    isCurrent
-                      ? "border-primary/50 bg-primary/10 text-primary shadow-[0_0_10px_rgba(255,69,0,0.2)]"
-                      : rn < currentRound
-                      ? "border-white/5 text-white/30"
-                      : "border-white/10 text-white/50"
-                  }`}>
-                    {label}
+                <div key={`L-${round}`} className="relative flex-shrink-0" style={{ marginRight: 24 }}>
+                  {/* Column label */}
+                  <div className="absolute -top-8 left-0 right-0 text-center">
+                    <span className={`font-mono text-[9px] uppercase tracking-widest ${round === currentRound ? "text-primary" : "text-white/20"}`}>
+                      {round === 1 ? "Round 1" : round === totalRounds - 1 ? "Semifinals" : `Round ${round}`}
+                    </span>
                   </div>
+                  <div className="relative" style={{ width: CARD_W, height: colHeight }}>
+                    {Array.from({ length: r1PerSide / Math.pow(2, round - 1) }).map((_, idx) => {
+                      const match = lMatches[idx] || null;
+                      const top = matchTop(round, idx);
+                      const midY = top + CARD_H / 2;
+                      const isTopOfPair = idx % 2 === 0;
+                      const pairPartnerMidY = isTopOfPair
+                        ? matchTop(round, idx + 1) + CARD_H / 2
+                        : matchTop(round, idx - 1) + CARD_H / 2;
+                      return (
+                        <div key={idx} className="absolute" style={{ top, left: 0 }}>
+                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} />
+                          {/* Horizontal stub right */}
+                          <div className="absolute top-1/2 -translate-y-1/2" style={{ left: CARD_W, width: 24, height: 1, background: match?.winnerId ? "rgba(255,69,0,0.5)" : "rgba(255,255,255,0.1)" }} />
+                          {/* Vertical connector (for top of pair) */}
+                          {isTopOfPair && idx + 1 < r1PerSide / Math.pow(2, round - 1) && (
+                            <div className="absolute" style={{ left: CARD_W + 23, top: CARD_H / 2, width: 1, height: pairPartnerMidY - midY, background: "rgba(255,255,255,0.1)" }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
 
-                  {/* Connector + matches */}
-                  <div className="flex flex-col" style={{ gap: rn > 1 ? `${(Math.pow(2, rn - 1) - 1) * 16}px` : "8px" }}>
-                    {roundMatches.map((match, idx) => (
-                      <div key={match.id} className="relative w-[200px]">
-                        {/* Glowing connector line to next round */}
-                        {rn < Math.max(...allRoundNumbers) && (
-                          <motion.div
-                            animate={match.winnerId ? { opacity: [0.3, 0.8, 0.3] } : { opacity: 0.1 }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-px"
-                            style={{
-                              background: match.winnerId
-                                ? "linear-gradient(90deg, rgba(255,69,0,0.5), rgba(255,69,0,0.1))"
-                                : "rgba(255,255,255,0.1)",
-                            }}
-                          />
-                        )}
+            {/* CENTER: Final */}
+            {finalRound && (
+              <div className="relative flex-shrink-0 flex flex-col items-center" style={{ width: CARD_W + 48, height: colHeight, marginLeft: 24, marginRight: 24 }}>
+                {/* Trophy */}
+                <div className="absolute -top-8 left-0 right-0 text-center">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-yellow-400">Grand Final</span>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
+                  <motion.div animate={{ boxShadow: ["0 0 10px rgba(234,179,8,0.2)", "0 0 30px rgba(234,179,8,0.5)", "0 0 10px rgba(234,179,8,0.2)"] }} transition={{ duration: 2, repeat: Infinity }} className="w-12 h-12 rounded-full border border-yellow-500/40 bg-yellow-950/30 flex items-center justify-center mb-2">
+                    <Trophy className="w-6 h-6 text-yellow-400" />
+                  </motion.div>
+                  <MatchCard
+                    match={matches.find(m => m.side === "F" && m.roundNumber === finalRound) || null}
+                    isCurrentRound={currentRound === finalRound}
+                    onWin={handleWin}
+                    isFinal
+                  />
+                </div>
+              </div>
+            )}
 
-                        <MatchCard
-                          match={match}
-                          isActive={isCurrent && match.status === "pending" && !match.isBye}
-                          onDeclareWinner={handleDeclareWinner}
-                          onSetCast={(mid) => handleSetCast(mid)}
-                          canDeclare={isCurrent}
-                          isCasting={tournament.activeMatchId === match.id}
-                        />
-                      </div>
-                    ))}
+            {/* RIGHT SIDE: rounds progress right→left (innermost first) */}
+            {[...rightRounds].reverse().map((round, ri) => {
+              const rMatches = getMatches("R", round);
+              const matchCount = r1PerSide / Math.pow(2, round - 1);
+              return (
+                <div key={`R-${round}`} className="relative flex-shrink-0" style={{ marginLeft: ri === 0 ? 0 : 24 }}>
+                  <div className="absolute -top-8 left-0 right-0 text-center">
+                    <span className={`font-mono text-[9px] uppercase tracking-widest ${round === currentRound ? "text-primary" : "text-white/20"}`}>
+                      {round === 1 ? "Round 1" : round === totalRounds - 1 ? "Semifinals" : `Round ${round}`}
+                    </span>
+                  </div>
+                  <div className="relative" style={{ width: CARD_W, height: colHeight }}>
+                    {Array.from({ length: matchCount }).map((_, idx) => {
+                      const match = rMatches[idx] || null;
+                      const top = matchTop(round, idx);
+                      const midY = top + CARD_H / 2;
+                      const isTopOfPair = idx % 2 === 0;
+                      const pairPartnerMidY = isTopOfPair
+                        ? matchTop(round, idx + 1) + CARD_H / 2
+                        : matchTop(round, idx - 1) + CARD_H / 2;
+                      return (
+                        <div key={idx} className="absolute" style={{ top, left: 0 }}>
+                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} />
+                          {/* Horizontal stub left */}
+                          <div className="absolute top-1/2 -translate-y-1/2" style={{ right: CARD_W, width: 24, height: 1, background: match?.winnerId ? "rgba(255,69,0,0.5)" : "rgba(255,255,255,0.1)" }} />
+                          {/* Vertical connector */}
+                          {isTopOfPair && idx + 1 < matchCount && (
+                            <div className="absolute" style={{ right: CARD_W + 23, top: CARD_H / 2, width: 1, height: pairPartnerMidY - midY, background: "rgba(255,255,255,0.1)" }} />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
 
-      {/* Round progress indicator */}
-      {tournament && (
-        <div className="flex items-center gap-1 flex-wrap mt-2">
-          {Array.from({ length: tournament.totalRounds }).map((_, i) => {
-            const rn = i + 1;
-            return (
-              <div key={rn} className="flex items-center gap-1">
-                <div className={`h-2 w-8 rounded-full transition-all duration-500 ${
-                  rn < currentRound ? "bg-primary/80" :
-                  rn === currentRound ? "bg-primary animate-pulse" :
-                  "bg-white/10"
-                }`} />
-                {i < tournament.totalRounds - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
-              </div>
-            );
-          })}
-          <span className="font-mono text-[10px] text-muted-foreground ml-2 uppercase tracking-widest">
-            Round {currentRound}/{tournament.totalRounds}
-          </span>
+          {/* Round progress dots */}
+          <div className="flex items-center gap-2 mt-4 justify-center flex-wrap">
+            {Array.from({ length: totalRounds }).map((_, i) => {
+              const rn = i + 1;
+              return (
+                <div key={rn} className="flex items-center gap-2">
+                  <div className={`h-1.5 w-10 rounded-full transition-all duration-500 ${rn < currentRound ? "bg-primary/80" : rn === currentRound ? "bg-primary animate-pulse" : "bg-white/10"}`} />
+                  {i < totalRounds - 1 && <div className="w-2 h-px bg-white/10" />}
+                </div>
+              );
+            })}
+            <span className="font-mono text-[10px] text-muted-foreground ml-2 uppercase">Round {currentRound}/{totalRounds}</span>
+          </div>
         </div>
       )}
     </div>
