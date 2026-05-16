@@ -696,6 +696,11 @@ export default function Battle() {
     const socket = io(getApiUrl(), {
       path: "/socket.io",
       transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      secure: getApiUrl().startsWith("https"),
+      forceNew: true,
     });
     socketRef.current = socket;
     socket.on("connect", () => { socket.emit("joinRoom", { roomId, playerName: myRobot.playerName }); });

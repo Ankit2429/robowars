@@ -35,6 +35,11 @@ export default function Play() {
     const socket = io(url, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      secure: url.startsWith("https"),
+      forceNew: true,
     });
     socketRef.current = socket;
 

@@ -38,9 +38,9 @@ app.get("/api/debug/ping", (_req, res) => {
 });
 
 // Multiplayer debug endpoint — shows live socket/queue/room state
-app.get("/api/debug/multiplayer", (_req, res) => {
+app.get("/api/debug/multiplayer", async (_req, res) => {
   try {
-    const { getDebugState } = require("./socket");
+    const { getDebugState } = await import("./socket");
     res.json(getDebugState());
   } catch (err: any) {
     res.json({ error: err.message });

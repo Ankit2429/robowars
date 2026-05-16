@@ -67,12 +67,31 @@ export function getDebugState() {
 export function setupSocketIO(server: HttpServer) {
   const io = new SocketIOServer(server, {
     path: "/socket.io",
-    cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: {
+      origin: (origin, callback) => {
+        // Allow all origins in production, including Vercel and local dev
+        callback(null, true);
+      },
+      methods: ["GET", "POST"],
+      credentials: true,
+      allowedHeaders: ["my-custom-header"],
+    },
     transports: ["websocket", "polling"],
+    allowEIO3: true, // Compatibility
     pingInterval: 10000,
     pingTimeout: 5000,
   });
   _io = io;
+
+  // Connection error logging
+  io.engine.on("connection_error", (err) => {
+    logger.error({ 
+      req: err.req.url, 
+      code: err.code, 
+      message: err.message, 
+      context: err.context 
+    }, "Socket.IO ENGINE connection error");
+  });
 
   // Listen for admin changes and broadcast to all players
   globalEvents.on(EVENTS.MATCHMAKING_STATUS_CHANGED, (active: boolean) => {
