@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "wouter";
 import { Trophy, Swords, Play, RotateCcw, ChevronRight, Zap, Crown, Shield } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
@@ -46,6 +47,7 @@ interface Tournament {
   currentRound: number;
   totalRounds: number;
   winnerId: number | null;
+  activeMatchId: number | null;
 }
 
 interface TournamentState {
@@ -73,12 +75,16 @@ function MatchCard({
   match,
   isActive,
   onDeclareWinner,
+  onSetCast,
   canDeclare,
+  isCasting,
 }: {
   match: TMatch;
   isActive: boolean;
   onDeclareWinner: (matchId: number, winnerId: number, winnerName: string) => void;
+  onSetCast: (matchId: number | null) => void;
   canDeclare: boolean;
+  isCasting: boolean;
 }) {
   const isFinished = match.status === "finished";
   const isBye = match.isBye;
@@ -141,12 +147,20 @@ function MatchCard({
               </p>
             </div>
             {canDeclare && !isFinished && match.player1Id && (
-              <button
-                onClick={() => onDeclareWinner(match.id, match.player1Id!, match.player1Name!)}
-                className="shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded"
-              >
-                WIN
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onSetCast(isCasting ? null : match.id)}
+                  className={`shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border transition-all rounded ${isCasting ? 'bg-primary border-primary text-black' : 'border-primary/40 text-primary hover:bg-primary/20'}`}
+                >
+                  {isCasting ? 'CASTING' : 'CAST'}
+                </button>
+                <button
+                  onClick={() => onDeclareWinner(match.id, match.player1Id!, match.player1Name!)}
+                  className="shrink-0 text-[9px] font-mono uppercase tracking-widest px-2 py-1 border border-primary/40 text-primary hover:bg-primary hover:text-black transition-all rounded"
+                >
+                  WIN
+                </button>
+              </div>
             )}
           </motion.div>
 
@@ -294,6 +308,22 @@ export function TournamentBracket({ registeredPlayers }: Props) {
     }
   };
 
+  const handleSetCast = async (matchId: number | null) => {
+    if (!state.tournament) return;
+    setLoading(true);
+    try {
+      await customFetch("/api/tournament/set-active-match", {
+        method: "POST",
+        body: JSON.stringify({ tournamentId: state.tournament.id, matchId }),
+      });
+      loadTournament();
+    } catch (e: any) {
+      flash(`❌ ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeclareWinner = async (matchId: number, winnerId: number, winnerName: string) => {
     setLoading(true);
     try {
@@ -351,6 +381,13 @@ export function TournamentBracket({ registeredPlayers }: Props) {
             >
               <ChevronRight className="h-3.5 w-3.5" /> Advance Round
             </button>
+          )}
+          {tournament && (
+            <Link href="/cast" target="_blank">
+              <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 border border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all font-mono text-[11px] uppercase tracking-widest rounded">
+                <Zap className="h-3.5 w-3.5" /> Launch Cast Mode
+              </button>
+            </Link>
           )}
           {tournament && (
             <button
@@ -455,7 +492,9 @@ export function TournamentBracket({ registeredPlayers }: Props) {
                           match={match}
                           isActive={isCurrent && match.status === "pending" && !match.isBye}
                           onDeclareWinner={handleDeclareWinner}
+                          onSetCast={(mid) => handleSetCast(mid)}
                           canDeclare={isCurrent}
+                          isCasting={tournament.activeMatchId === match.id}
                         />
                       </div>
                     ))}

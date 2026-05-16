@@ -291,4 +291,22 @@ router.post("/tournament/reset", async (req, res) => {
   }
 });
 
+// ── POST /api/tournament/set-active-match ──────────────────────────────────────
+router.post("/tournament/set-active-match", async (req, res) => {
+  try {
+    const { tournamentId, matchId } = req.body as { tournamentId: number; matchId: number | null };
+    
+    await db.update(tournamentsTable)
+      .set({ activeMatchId: matchId })
+      .where(eq(tournamentsTable.id, tournamentId));
+      
+    globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, tournamentId);
+    res.json({ success: true });
+  } catch (err: any) {
+    req.log.error({ err: err.message }, "Failed to set active match");
+    res.status(500).json({ error: "Failed to set active match", detail: err.message });
+  }
+});
+
 export default router;
+

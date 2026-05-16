@@ -161,10 +161,12 @@ async function ensureSchema() {
         current_round INTEGER NOT NULL DEFAULT 0,
         total_rounds INTEGER NOT NULL DEFAULT 0,
         winner_id INTEGER,
+        active_match_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       )`,
     },
+
     {
       name: "tournament_players",
       sql: `CREATE TABLE IF NOT EXISTS tournament_players (

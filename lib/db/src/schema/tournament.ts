@@ -10,9 +10,11 @@ export const tournamentsTable = pgTable("tournaments", {
   currentRound: integer("current_round").notNull().default(0),
   totalRounds: integer("total_rounds").notNull().default(0),
   winnerId: integer("winner_id"),
+  activeMatchId: integer("active_match_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
 
 export const insertTournamentSchema = createInsertSchema(tournamentsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTournament = z.infer<typeof insertTournamentSchema>;
