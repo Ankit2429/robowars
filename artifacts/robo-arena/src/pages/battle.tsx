@@ -357,29 +357,13 @@ function GameController({
     if (!gameActive) return;
     const dt = Math.min(delta, 0.1);
     
-    // ── Freeze-frame effect
-    if (freezeTimerRef.current > 0) {
-      freezeTimerRef.current -= dt;
-      return; // Skip physics/logic updates while frozen
-    }
-
     // ── Apply velocity → position
     p1PosRef.current.x += p1VelRef.current.x * dt;
     p1PosRef.current.z += p1VelRef.current.z * dt;
     p2PosRef.current.x += p2VelRef.current.x * dt;
     p2PosRef.current.z += p2VelRef.current.z * dt;
 
-    // ── Wall collision — strong knockback bounce (robots must NOT stick to walls)
-    const wallBounce = (pos: PosRef, vel: VelRef) => {
-      const WALL_PUSH = 1.5; // push robot inward on contact
-      const MIN_BOUNCE = 8;  // minimum bounce-back velocity
-      if (pos.x >  ARENA_X) { pos.x = ARENA_X - WALL_PUSH; vel.x = -Math.max(Math.abs(vel.x) * WALL_BOUNCE, MIN_BOUNCE); }
-      if (pos.x < -ARENA_X) { pos.x = -ARENA_X + WALL_PUSH; vel.x = Math.max(Math.abs(vel.x) * WALL_BOUNCE, MIN_BOUNCE); }
-      if (pos.z >  ARENA_Z) { pos.z = ARENA_Z - WALL_PUSH; vel.z = -Math.max(Math.abs(vel.z) * WALL_BOUNCE, MIN_BOUNCE); }
-      if (pos.z < -ARENA_Z) { pos.z = -ARENA_Z + WALL_PUSH; vel.z = Math.max(Math.abs(vel.z) * WALL_BOUNCE, MIN_BOUNCE); }
-    };
-    wallBounce(p1PosRef.current, p1VelRef.current);
-    wallBounce(p2PosRef.current, p2VelRef.current);
+    // ── No Walls — removed bounds per request
 
     // ── Clamp max speed (prevents runaway velocities)
     const clampVel = (vel: VelRef) => {
@@ -820,12 +804,9 @@ export default function Battle() {
       p2VelRef.current.x += (dx / d) * kb;
       p2VelRef.current.z += (dz / d) * kb;
     }
+    // Reduced screen shake drastically
     setScreenShake(true);
-    setTimeout(() => setScreenShake(false), shakeMs);
-    
-    if (intensity === "heavy") {
-      freezeTimerRef.current = 0.05; // 50ms freeze frame
-    }
+    setTimeout(() => setScreenShake(false), shakeMs * 0.3);
     
     const mx = (p1PosRef.current.x + p2PosRef.current.x) / 2;
     const mz = (p1PosRef.current.z + p2PosRef.current.z) / 2;
@@ -846,12 +827,13 @@ export default function Battle() {
     return Math.sqrt(dx * dx + dz * dz) < maxDist;
   };
 
-  // ── Lunge helper
+  // ── Lunge helper - removed forced direction lock, just apply forward impulse
   const lungeTo = (power: number) => {
+    // Apply impulse in the direction the player is already moving or facing, 
+    // or towards opponent if they want, but don't lock the direction vector
     const dx = p2PosRef.current.x - p1PosRef.current.x;
     const dz = p2PosRef.current.z - p1PosRef.current.z;
     const d  = Math.sqrt(dx * dx + dz * dz) || 1;
-    p1LungeDirRef.current = { x: dx/d, z: dz/d, active: true };
     p1VelRef.current.x += (dx/d) * power;
     p1VelRef.current.z += (dz/d) * power;
   };
@@ -879,7 +861,6 @@ export default function Battle() {
       } else {
         socketRef.current?.emit("attack", { roomId, attackType: "punch", damage: dmg });
       }
-      p1LungeDirRef.current.active = false;
       setTimeout(() => { setP1Attacking(false); primaryCoolRef.current = false; }, PRIMARY_CD);
     }, 130);
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -216,10 +216,40 @@ export function setupSocketIO(server: HttpServer) {
     };
 
     // ── Matchmaking ──────────────────────────────────────────────────────────
-    socket.on("findMatch", ({ playerName, robotId }: { playerName: string; robotId?: number }) => {
+    socket.on("findMatch", async ({ playerName, robotId }: { playerName: string; robotId?: number }) => {
       logger.info({ socketId: socket.id, playerName, robotId, currentQueueLength: matchQueue.length }, "findMatch received");
 
-      // Remove any existing entry for this socket
+      // ── Tournament Priority: Check if player has an active tournament match
+      try {
+        const activeMatches = await db.select().from(tournamentMatchesTable)
+          .where(and(
+            eq(tournamentMatchesTable.status, "pending"),
+            db.or(
+              eq(tournamentMatchesTable.player1Name, playerName),
+              eq(tournamentMatchesTable.player2Name, playerName)
+            )
+          ));
+
+        if (activeMatches.length > 0 && activeMatches[0].battleRoomId) {
+          const match = activeMatches[0];
+          logger.info({ playerName, roomId: match.battleRoomId }, "Player routed to allotted tournament match");
+          
+          // Ensure room exists in memory
+          if (!rooms.has(match.battleRoomId)) {
+            rooms.set(match.battleRoomId, { players: [], status: "waiting" });
+          }
+          
+          const opponentName = match.player1Name === playerName ? match.player2Name : match.player1Name;
+          const side = match.player1Name === playerName ? "p1" : "p2";
+          
+          socket.emit("matchFound", { roomId: match.battleRoomId, opponentName: opponentName || "Opponent", side });
+          return; // Skip normal queue
+        }
+      } catch (err) {
+        logger.error({ err, playerName }, "Failed to check tournament matches during matchmaking");
+      }
+
+      // ── Normal Matchmaking Queue ──
       const existingIdx = matchQueue.findIndex(p => p.socketId === socket.id);
       if (existingIdx !== -1) {
         matchQueue.splice(existingIdx, 1);
@@ -230,8 +260,6 @@ export function setupSocketIO(server: HttpServer) {
       socket.data.playerName = playerName;
 
       broadcastDebug();
-
-      // Emit searching immediately; loop will handle pairing
       socket.emit("matchSearching");
     });
 
