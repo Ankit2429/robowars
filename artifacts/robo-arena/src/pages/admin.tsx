@@ -3,11 +3,16 @@ import { Link } from "wouter";
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
 import { getApiUrl } from "@/lib/api-url";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sword, LayoutDashboard, Trophy, Users, Shield, LogOut, RefreshCw, Play, Square, ArrowLeft } from "lucide-react";
+import { useSession } from "@/context/SessionContext";
 
 export default function Admin() {
+  const { logout: playerLogout } = useSession();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authKey, setAuthKey] = useState("");
   const [authMsg, setAuthMsg] = useState("");
+  const [shake, setShake] = useState(false);
   
   const [activeTab, setActiveTab] = useState<"roster" | "bracket" | "codes">("roster");
   
@@ -65,11 +70,13 @@ export default function Admin() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (authKey === "admin123") {
+    if (authKey === "bot123") {
       setIsAuthenticated(true);
       setAuthMsg("");
     } else {
-      setAuthMsg("Incorrect Security Key.");
+      setAuthMsg("INVALID ACCESS CODE");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
     }
   };
 
@@ -116,122 +123,237 @@ export default function Admin() {
 
   if (!isAuthenticated) {
     return (
-      <div className="view active" style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem', position: 'relative', overflow: 'hidden' }}>
-        {/* Cyberpunk Grid Background */}
-        <div className="cyber-grid"></div>
-
-        {/* Decorative Tech Elements */}
-        <div className="cyber-deco deco-top-left">SYS.VER://3.04.9X</div>
-        <div className="cyber-deco deco-bottom-right">STATUS://[ONLINE]</div>
-        <div className="cyber-lines"></div>
-
-        <div className="glass-panel form-container relative z-10">
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '1.5rem', borderBottom: '1px solid var(--primary-dim)', paddingBottom: '1rem' }}>
-            <Link href="/" className="nav-btn"><i className="fa-solid fa-home"></i> Home</Link>
-          </div>
-          <h2>Admin Authentication</h2>
-          <form onSubmit={handleLogin}>
-            <div className="input-group">
-              <label>Security Key</label>
-              <input className="robowars-input" type="password" value={authKey} onChange={e => setAuthKey(e.target.value)} required placeholder="Enter admin password (admin123)" />
-            </div>
-            <button type="submit" className="btn primary-btn">ACCESS PANEL</button>
-          </form>
-          {authMsg && <div className="message error">{authMsg}</div>}
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden">
+        <div className="scanlines opacity-40" />
+        <div className="crt-flicker" />
+        
+        {/* Background glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[700px] h-[700px] rounded-full bg-primary/10 blur-[140px]" />
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="relative z-10 w-full max-w-md px-8 py-12 border border-primary/20 bg-black/60 backdrop-blur-xl rounded-2xl shadow-2xl"
+        >
+          <div className="text-center mb-10">
+            <div className="inline-flex p-3 rounded-full bg-primary/20 border border-primary/40 mb-4 shadow-[0_0_15px_rgba(255,69,0,0.3)]">
+              <Shield className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="font-display text-4xl font-black text-white uppercase tracking-widest">
+              ADMIN <span className="text-primary">PORTAL</span>
+            </h1>
+            <p className="font-mono text-xs text-muted-foreground mt-2 tracking-tighter opacity-60">
+              RESTRICTED AREA • AUTHORIZATION REQUIRED
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <motion.div animate={shake ? { x: [-8, 8, -6, 6, -4, 4, 0] } : {}}>
+              <label className="font-mono text-[10px] uppercase tracking-widest text-primary block mb-2 font-bold">
+                Access Code
+              </label>
+              <input 
+                type="password" 
+                value={authKey} 
+                onChange={e => setAuthKey(e.target.value)} 
+                required 
+                placeholder="••••••••"
+                className="w-full bg-black/50 border-2 border-border focus:border-primary outline-none px-4 py-4 font-mono text-white text-xl text-center tracking-[0.5em] transition-all placeholder:text-muted-foreground/20"
+              />
+            </motion.div>
+
+            <button 
+              type="submit" 
+              className="w-full py-5 font-display font-black text-lg uppercase tracking-widest border-2 border-primary text-primary bg-primary/5 hover:bg-primary hover:text-black transition-all duration-300 shadow-[0_0_20px_rgba(255,69,0,0.2)] hover:shadow-[0_0_40px_rgba(255,69,0,0.5)]"
+            >
+              GRANT ACCESS
+            </button>
+          </form>
+
+          {authMsg && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 p-3 border border-red-500/30 bg-red-500/10 text-red-500 font-mono text-[10px] text-center uppercase tracking-widest"
+            >
+              {authMsg}
+            </motion.div>
+          )}
+
+          <div className="mt-10 pt-6 border-t border-white/5 text-center">
+            <Link href="/" className="font-mono text-[9px] text-muted-foreground hover:text-primary transition-colors uppercase tracking-[0.2em] flex items-center justify-center gap-2 group">
+              <ArrowLeft className="h-3 w-3 group-hover:-translate-x-1 transition-transform" /> Back to Arena
+            </Link>
+          </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="view active" style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem', position: 'relative', overflow: 'hidden' }}>
-      {/* Cyberpunk Grid Background */}
-      <div className="cyber-grid"></div>
+    <div className="min-h-screen bg-[#050508] text-white selection:bg-primary/30 font-display pt-20">
+      <div className="scanlines opacity-20 pointer-events-none" />
+      
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 h-20 bg-black/80 backdrop-blur-md border-b border-white/5 z-50 flex items-center justify-between px-8">
+        <div className="flex items-center gap-4">
+          <div className="p-2 border border-primary/40 rounded bg-primary/10">
+            <Shield className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-black text-xl uppercase tracking-widest">RoboWars <span className="text-primary">Admin</span></h1>
+            <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-tighter opacity-60">Operations Management Interface</p>
+          </div>
+        </div>
 
-      {/* Decorative Tech Elements */}
-      <div className="cyber-deco deco-top-left">SYS.VER://3.04.9X</div>
-      <div className="cyber-deco deco-bottom-right">STATUS://[ONLINE]</div>
-      <div className="cyber-lines"></div>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setIsAuthenticated(false)}
+            className="flex items-center gap-2 px-4 py-2 font-mono text-xs uppercase tracking-widest border border-white/10 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all rounded"
+          >
+            <LogOut className="h-3 w-3" /> Logout
+          </button>
+        </div>
+      </div>
 
-      <div className="admin-layout relative z-10">
-        <aside className="admin-sidebar glass-panel">
-          <h3>Dashboard</h3>
-          <ul className="admin-nav">
-            <li className={activeTab === "roster" ? "active" : ""} onClick={() => setActiveTab("roster")}>Roster</li>
-            <li className={activeTab === "bracket" ? "active" : ""} onClick={() => setActiveTab("bracket")}>Tournament Bracket</li>
-
-          </ul>
-          <div style={{ marginTop: '2rem', borderTop: '1px solid var(--primary-dim)', paddingTop: '1rem' }}>
-            <Link href="/" className="nav-btn" style={{ width: '100%', textAlign: 'left', display: 'block' }}>
-              <i className="fa-solid fa-home"></i> Home
+      <div className="max-w-7xl mx-auto p-8 grid grid-cols-[280px_1fr] gap-8">
+        {/* Sidebar */}
+        <aside className="space-y-2">
+          <button 
+            onClick={() => setActiveTab("roster")}
+            className={`w-full flex items-center gap-3 px-6 py-4 font-mono text-[11px] uppercase tracking-widest rounded-lg transition-all border ${activeTab === "roster" ? "bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(255,69,0,0.1)]" : "border-white/5 hover:bg-white/5 text-muted-foreground"}`}
+          >
+            <Users className="h-4 w-4" /> Roster
+          </button>
+          <button 
+            onClick={() => setActiveTab("bracket")}
+            className={`w-full flex items-center gap-3 px-6 py-4 font-mono text-[11px] uppercase tracking-widest rounded-lg transition-all border ${activeTab === "bracket" ? "bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(255,69,0,0.1)]" : "border-white/5 hover:bg-white/5 text-muted-foreground"}`}
+          >
+            <Trophy className="h-4 w-4" /> Tournament
+          </button>
+          
+          <div className="mt-8 pt-8 border-t border-white/5">
+            <Link href="/" className="w-full flex items-center gap-3 px-6 py-4 font-mono text-[11px] uppercase tracking-widest rounded-lg border border-white/5 text-muted-foreground hover:bg-white/5 transition-all">
+              <Sword className="h-4 w-4" /> Return to Arena
             </Link>
           </div>
         </aside>
-        
-        <div className="admin-content glass-panel">
-          {activeTab === "roster" && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2>Registered Players</h2>
-                <button onClick={refreshData} className="btn" style={{ width: 'auto', fontSize: '0.8rem' }}>
-                  {isLoading ? 'SYNCING...' : 'REFRESH LIST'}
-                </button>
-              </div>
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>USN</th>
-                      <th>Branch</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {players.map((p: any) => (
-                      <tr key={p.id}>
-                        <td>{p.name}</td>
-                        <td>{p.usn}</td>
-                        <td>{p.branch}</td>
-                        <td><span style={{ background: 'var(--primary-dim)', color: 'var(--primary-color)', padding: '4px 8px', borderRadius: '4px' }}>{p.status}</span></td>
-                      </tr>
-                    ))}
-                    {players.length === 0 && (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#666' }}>No players registered yet.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
 
-          {activeTab === "bracket" && (
-            <div>
-              <div className="bracket-header">
-                <h2>Tournament & Matchmaking</h2>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--primary-dim)' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{queueCount}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase' }}>Players Queued</span>
+        {/* Content */}
+        <main>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm"
+            >
+              {activeTab === "roster" && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-black uppercase tracking-widest">Pilot Roster</h2>
+                      <p className="font-mono text-xs text-muted-foreground uppercase mt-1">Authorized Combatants Listing</p>
+                    </div>
+                    <button 
+                      onClick={refreshData}
+                      disabled={isLoading}
+                      className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all rounded font-mono text-[10px] uppercase tracking-widest disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} /> {isLoading ? 'Syncing...' : 'Refresh List'}
+                    </button>
                   </div>
-                  <button 
-                    className={`btn ${matchmakingActive ? '' : 'primary-btn'}`} 
-                    style={matchmakingActive ? { backgroundColor: '#e74c3c', color: 'white' } : {}}
-                    onClick={toggleMatchmaking}
-                  >
-                    {matchmakingActive ? 'STOP MATCHMAKING' : 'START MATCHMAKING'}
-                  </button>
+
+                  <div className="overflow-hidden border border-white/5 rounded-xl">
+                    <table className="w-full text-left font-mono text-[11px] uppercase">
+                      <thead>
+                        <tr className="bg-white/5 border-b border-white/5">
+                          <th className="px-6 py-4 text-primary font-black tracking-widest">USN (Pilot ID)</th>
+                          <th className="px-6 py-4 text-primary font-black tracking-widest">Name</th>
+                          <th className="px-6 py-4 text-primary font-black tracking-widest">Branch</th>
+                          <th className="px-6 py-4 text-primary font-black tracking-widest">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {players.map((p: any) => (
+                          <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4 font-bold text-white">{p.usn}</td>
+                            <td className="px-6 py-4 text-muted-foreground">{p.name}</td>
+                            <td className="px-6 py-4 text-muted-foreground">{p.branch}</td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded text-[9px] ${p.status === 'Eliminated' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
+                                {p.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {players.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground opacity-50 tracking-widest">
+                              NO PILOTS DETECTED IN SECTOR
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-              <div className="bracket-container">
-                <p style={{ color: '#666', marginTop: '2rem' }}>[Bracket generation logic placeholder - players manage matches here]</p>
-              </div>
-            </div>
-          )}
+              )}
 
+              {activeTab === "bracket" && (
+                <div className="space-y-8">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-black uppercase tracking-widest">Tournament Ops</h2>
+                      <p className="font-mono text-xs text-muted-foreground uppercase mt-1">Combat Engagement Protocols</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="bg-black/50 border border-white/5 px-4 py-2 rounded flex items-center gap-3">
+                        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">Queue</span>
+                        <span className="text-primary font-black text-lg">{queueCount}</span>
+                      </div>
+                      <button 
+                        onClick={toggleMatchmaking}
+                        className={`flex items-center gap-3 px-8 py-3 rounded font-black text-xs uppercase tracking-[0.2em] transition-all border ${matchmakingActive ? 'bg-red-500/10 border-red-500 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-green-500/10 border-green-500 text-green-500 hover:bg-green-500 hover:text-white'}`}
+                      >
+                        {matchmakingActive ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {matchmakingActive ? 'HALT OPS' : 'INITIATE OPS'}
+                      </button>
+                    </div>
+                  </div>
 
-        </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl space-y-4">
+                      <h3 className="font-bold uppercase tracking-widest text-sm border-b border-white/5 pb-2">Tournament Status</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono text-[10px] text-muted-foreground uppercase">Active Combatants</span>
+                          <span className="font-mono text-xs text-white">{players.filter(p => !p.eliminated).length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono text-[10px] text-muted-foreground uppercase">Eliminated Units</span>
+                          <span className="font-mono text-xs text-white">{players.filter(p => p.eliminated).length}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl flex items-center justify-center opacity-30 italic">
+                      <p className="font-mono text-[10px] uppercase tracking-widest">Advanced Bracket Visualizer Offline</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
     </div>
   );
+}
 }

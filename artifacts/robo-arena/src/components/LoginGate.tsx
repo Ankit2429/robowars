@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Sword, Zap, AlertTriangle } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { STARTING_POINTS } from "@/lib/session";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isEliminated, login, logout, session } = useSession();
@@ -208,15 +208,15 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
       {/* Admin Portal Access */}
       <div className="absolute bottom-8 right-8 z-20">
-        <a 
+        <Link 
           href="/admin" 
-          className="opacity-50 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-2 group scale-90 origin-bottom-right"
+          className="opacity-50 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-2 group scale-90 origin-bottom-right cursor-pointer"
         >
           <div className="p-2.5 border border-primary/40 rounded-lg bg-primary/10 group-hover:bg-primary/20 group-hover:border-primary/80 group-hover:shadow-[0_0_15px_rgba(255,69,0,0.4)] transition-all">
             <Sword className="h-5 w-5 text-primary" />
           </div>
           <span className="font-mono text-[10px] text-primary/70 uppercase tracking-[0.2em] font-bold group-hover:text-primary transition-colors">ADMIN PORTAL</span>
-        </a>
+        </Link>
       </div>
     </div>
   );
