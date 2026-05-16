@@ -45,7 +45,8 @@ export default function Play() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("[Play] Socket CONNECTED, id:", socket.id, "transport:", socket.io.engine?.transport?.name);
+      const transportName = (socket as any).io?.engine?.transport?.name || "unknown";
+      console.log("[Play] Socket CONNECTED, id:", socket.id, "transport:", transportName);
     });
     socket.on("connect_error", (err) => {
       console.error("[Play] Socket CONNECT_ERROR:", err.message, "URL was:", url);

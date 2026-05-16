@@ -334,11 +334,11 @@ export default function Admin() {
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="font-mono text-[10px] text-muted-foreground uppercase">Active Combatants</span>
-                          <span className="font-mono text-xs text-white">{players.filter(p => !p.eliminated).length}</span>
+                          <span className="font-mono text-xs text-white">{players.filter(p => p.status !== 'Eliminated').length}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-mono text-[10px] text-muted-foreground uppercase">Eliminated Units</span>
-                          <span className="font-mono text-xs text-white">{players.filter(p => p.eliminated).length}</span>
+                          <span className="font-mono text-xs text-white">{players.filter(p => p.status === 'Eliminated').length}</span>
                         </div>
                       </div>
                     </div>
@@ -355,5 +355,4 @@ export default function Admin() {
       </div>
     </div>
   );
-}
 }
