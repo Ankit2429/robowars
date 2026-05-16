@@ -322,6 +322,8 @@ function GameController({
   p1PosRef, p2PosRef, p1VelRef, p2VelRef,
   keysRef, p1Speed, p2Speed, gameActive, isAI,
   onP1Move, onAIAttack, onSparks, p1LungeDirRef,
+  p1Attacking, p2Attacking, p1AttackPartId, p2AttackPartId,
+  freezeTimerRef, onRamDamage,
 }: {
   p1PosRef: React.MutableRefObject<PosRef>; p2PosRef: React.MutableRefObject<PosRef>;
   p1VelRef: React.MutableRefObject<VelRef>; p2VelRef: React.MutableRefObject<VelRef>;
@@ -334,6 +336,8 @@ function GameController({
   p1LungeDirRef: React.MutableRefObject<{ x: number; z: number; active: boolean }>;
   p1Attacking: boolean; p2Attacking: boolean;
   p1AttackPartId?: string; p2AttackPartId?: string;
+  freezeTimerRef: React.MutableRefObject<number>;
+  onRamDamage?: (dmg: number) => void;
 }) {
   const aiAttackTimer = useRef(0);
   const moveEmitTimer = useRef(0);
@@ -351,7 +355,13 @@ function GameController({
 
   useFrame((_, delta) => {
     if (!gameActive) return;
-    const dt = Math.min(delta, 0.04); // cap dt so physics don't explode
+    const dt = Math.min(delta, 0.1);
+    
+    // ── Freeze-frame effect
+    if (freezeTimerRef.current > 0) {
+      freezeTimerRef.current -= dt;
+      return; // Skip physics/logic updates while frozen
+    }
 
     // ── Apply velocity → position
     p1PosRef.current.x += p1VelRef.current.x * dt;
@@ -462,6 +472,19 @@ function GameController({
       p1VelRef.current.z += nz * imp * 0.5;
       p2VelRef.current.x -= nx * imp * 0.5;
       p2VelRef.current.z -= nz * imp * 0.5;
+
+      // Momentum Damage
+      if (relVN > 15 && collisionCool.current <= 0) {
+        // High-speed ramming deals damage
+        const ramDmg = Math.floor(relVN * 0.5);
+        if (isAI && onRamDamage) {
+           onRamDamage(ramDmg);
+           onSparks(p2PosRef.current.x, 1, p2PosRef.current.z, "#ff0000");
+        } else {
+           // In PvP, we rely on the attacker to report damage if they caused it.
+           // For simplicity, we could just let both clients apply it locally or report it.
+        }
+      }
 
       // Anti-stuck: escalating separation force if overlapping for too long
       stuckTimerRef.current += dt;
@@ -618,6 +641,7 @@ export default function Battle() {
   const p1VelRef = useRef<VelRef>({ x:  0, z: 0 });
   const p2VelRef = useRef<VelRef>({ x:  0, z: 0 });
   const p1LungeDirRef     = useRef({ x: 0, z: 0, active: false });
+  const freezeTimerRef     = useRef(0);
   const keysRef            = useRef<Set<string>>(new Set());
   const gameStatusRef      = useRef<"waiting"|"starting"|"playing"|"ended">("waiting");
   // ── Isolated per-weapon cooldown refs (true = on cooldown)
@@ -798,6 +822,11 @@ export default function Battle() {
     }
     setScreenShake(true);
     setTimeout(() => setScreenShake(false), shakeMs);
+    
+    if (intensity === "heavy") {
+      freezeTimerRef.current = 0.05; // 50ms freeze frame
+    }
+    
     const mx = (p1PosRef.current.x + p2PosRef.current.x) / 2;
     const mz = (p1PosRef.current.z + p2PosRef.current.z) / 2;
     const hitColor = who === "p1" ? myRobot.bodyColor : aiRobot.bodyColor;
@@ -827,9 +856,12 @@ export default function Battle() {
     p1VelRef.current.z += (dz/d) * power;
   };
 
-  // ── Damage calculator
-  const calcDmg = (base: number, power: number) =>
-    base + Math.floor(Math.random() * Math.max(1, power / 10));
+  // ── Damage calculator with Armor Scaling
+  const calcDmg = (base: number, power: number, defenderArmor: number = 50) => {
+    const raw = base + Math.floor(Math.random() * Math.max(1, power / 10));
+    const reduction = Math.min(0.5, (defenderArmor / 200)); // Max 50% damage reduction
+    return Math.floor(raw * (1 - reduction));
+  };
 
   // ─────────────────────────────────────────────────────────────────────
   // PRIMARY WEAPON  [Space] — main weapon swing, fast cooldown
@@ -839,7 +871,8 @@ export default function Battle() {
     primaryCoolRef.current = true;
     setP1Attacking(true);
     lungeTo(12); // scale lunge for heavy friction
-    const dmg = calcDmg(18, myRobot.stats.power);
+    const oppArmor = isAI ? aiRobot.stats.armor : opponentRobot.stats.armor;
+    const dmg = calcDmg(20, myRobot.stats.power, oppArmor);
     setTimeout(() => {
       if (isAI) {
         if (inRange(7)) { setP2Hp(p => Math.max(0, p - dmg)); flashHit("p2", "normal"); addDmgText(dmg, false); }
@@ -859,7 +892,8 @@ export default function Battle() {
     if (secondaryCoolRef.current) return;
     secondaryCoolRef.current = true;
     setP1Attacking(true);
-    const dmg = calcDmg(26, myRobot.stats.power);
+    const oppArmor = isAI ? aiRobot.stats.armor : opponentRobot.stats.armor;
+    const dmg = calcDmg(30, myRobot.stats.power, oppArmor);
     setTimeout(() => {
       if (isAI) {
         if (inRange(9)) { setP2Hp(p => Math.max(0, p - dmg)); flashHit("p2", "heavy"); addDmgText(dmg, false); }
@@ -883,7 +917,8 @@ export default function Battle() {
     specialCoolRef.current = true;
     setP1Attacking(true);
     lungeTo(32); // massive charge impulse
-    const dmg = calcDmg(35, myRobot.stats.power);
+    const oppArmor = isAI ? aiRobot.stats.armor : opponentRobot.stats.armor;
+    const dmg = calcDmg(42, myRobot.stats.power, oppArmor);
     setTimeout(() => {
       if (isAI) {
         if (inRange(9)) { setP2Hp(p => Math.max(0, p - dmg)); flashHit("p2", "heavy"); addDmgText(dmg, false); }
@@ -924,7 +959,7 @@ export default function Battle() {
   const handleAIAttack = useCallback(() => {
     if (gameStatusRef.current !== "playing" || p2Attacking) return;
     setP2Attacking(true);
-    const dmg = calcDmg(10, aiRobot.stats.power);
+    const dmg = calcDmg(12, aiRobot.stats.power, myRobot.stats.armor);
     setTimeout(() => {
       const dx = p2PosRef.current.x - p1PosRef.current.x;
       const dz = p2PosRef.current.z - p1PosRef.current.z;
@@ -1034,6 +1069,8 @@ export default function Battle() {
                 p1LungeDirRef={p1LungeDirRef}
                 p1Attacking={p1Attacking} p2Attacking={p2Attacking}
                 p1AttackPartId={myRobot.attackPartId} p2AttackPartId={aiRobot.attackPartId}
+                freezeTimerRef={freezeTimerRef}
+                onRamDamage={(dmg) => setP2Hp(p => Math.max(0, p - dmg))}
               />
               <ArenaRobot
                 posRef={p1PosRef} targetPosRef={p2PosRef} velRef={p1VelRef}

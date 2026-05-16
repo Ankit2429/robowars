@@ -1,8 +1,12 @@
 import { Server as SocketIOServer } from "socket.io";
 import { Server as HttpServer } from "http";
 import { db } from "@workspace/db";
-import { roomsTable, leaderboardTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { 
+  roomsTable, leaderboardTable, 
+  tournamentMatchesTable, tournamentPlayersTable 
+} from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+
 import { logger } from "./lib/logger";
 import { globalEvents, EVENTS } from "./lib/events";
 
@@ -392,11 +396,54 @@ async function endBattle(io: SocketIOServer, roomId: string, winnerName: string,
   room.status = "finished";
   try { await db.update(roomsTable).set({ status: "finished" }).where(eq(roomsTable.id, roomId)); }
   catch (err) { logger.error({ err }, "Failed to update room status to finished"); }
+  
   io.to(roomId).emit("battleEnd", { winnerName, loserName });
+
+  // ── Tournament Link: if this is a tournament room, update the match result
+  if (roomId.startsWith("tourney_")) {
+    try {
+      const matches = await db.select().from(tournamentMatchesTable).where(eq(tournamentMatchesTable.battleRoomId, roomId));
+      if (matches.length > 0) {
+        const match = matches[0];
+        const winner = room.players.find(p => p.playerName === winnerName);
+        if (winner) {
+          logger.info({ roomId, winnerName, tournamentId: match.tournamentId }, "Reporting tournament match result");
+          
+          // Call the tournament update logic (we can fetch the winner's player record from DB)
+          const [tournamentPlayer] = await db.select().from(tournamentPlayersTable)
+            .where(and(eq(tournamentPlayersTable.tournamentId, match.tournamentId), eq(tournamentPlayersTable.pilotName, winnerName)));
+          
+          if (tournamentPlayer) {
+            // We use fetch internally or just update the DB and trigger event
+            await db.update(tournamentMatchesTable).set({ 
+              winnerId: tournamentPlayer.id, 
+              winnerName: tournamentPlayer.pilotName, 
+              status: "finished" 
+            }).where(eq(tournamentMatchesTable.id, match.id));
+
+            const [loserPlayer] = await db.select().from(tournamentPlayersTable)
+              .where(and(eq(tournamentPlayersTable.tournamentId, match.tournamentId), eq(tournamentPlayersTable.pilotName, loserName)));
+            if (loserPlayer) {
+              await db.update(tournamentPlayersTable).set({ status: "eliminated" }).where(eq(tournamentPlayersTable.id, loserPlayer.id));
+            }
+
+            globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, match.tournamentId);
+            // The auto-advance logic is in the tournament route's listener or we can trigger it here
+            // Note: In our current tournament.ts, tryAutoAdvance is called from the endpoint. 
+            // We should ensure it's triggered.
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err, roomId }, "Failed to report tournament match result");
+    }
+  }
+
   try { await upsertLeaderboard(winnerName, true); await upsertLeaderboard(loserName, false); }
   catch (err) { logger.error({ err }, "Failed to update leaderboard"); }
   rooms.delete(roomId);
 }
+
 
 async function upsertLeaderboard(playerName: string, won: boolean) {
   const existing = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, playerName));

@@ -6,6 +6,15 @@ import {
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { globalEvents, EVENTS } from "../lib/events";
+import { logger } from "../lib/logger";
+
+// ── Auto-advance bridge: listen for updates from Sockets or elsewhere
+globalEvents.on(EVENTS.TOURNAMENT_UPDATED, (tournamentId: number) => {
+  if (tournamentId > 0) {
+    logger.info({ tournamentId }, "Auto-advance listener triggered");
+    tryAutoAdvance(tournamentId).catch(err => logger.error({ err, tournamentId }, "Auto-advance failed"));
+  }
+});
 
 const router = Router();
 
@@ -178,6 +187,7 @@ async function tryAutoAdvance(tournamentId: number) {
       player1RobotName: m.player1?.robotName ?? null,
       player2RobotName: m.player2?.robotName ?? null,
       isBye: m.isBye,
+      battleRoomId: m.isBye ? null : `tourney_${tournamentId}_r${nextRound}_m${m.matchNumber}_${Math.random().toString(36).slice(2, 7)}`,
       status: m.isBye ? ("finished" as const) : ("pending" as const),
       winnerId: m.byeWinner?.id ?? null,
       winnerName: m.byeWinner?.pilotName ?? null,
@@ -251,6 +261,7 @@ router.post("/tournament/start", async (req, res) => {
         player1RobotName: m.player1?.robotName ?? null,
         player2RobotName: m.player2?.robotName ?? null,
         isBye: m.isBye,
+        battleRoomId: m.isBye ? null : `tourney_${tournament.id}_r1_m${m.matchNumber}_${Math.random().toString(36).slice(2, 7)}`,
         status: m.isBye ? ("finished" as const) : ("pending" as const),
         winnerId: m.byeWinner?.id ?? null,
         winnerName: m.byeWinner?.pilotName ?? null,

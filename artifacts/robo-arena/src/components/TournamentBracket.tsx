@@ -4,6 +4,7 @@ import { Trophy, Swords, Play, RotateCcw, Crown, Zap, Shield } from "lucide-reac
 import { customFetch } from "@workspace/api-client-react";
 import { io, Socket } from "socket.io-client";
 import { getApiUrl } from "@/lib/api-url";
+import { useLocation } from "wouter";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface TPlayer { id: number; tournamentId: number; pilotName: string; robotName: string; seed: number; status: string; }
@@ -14,7 +15,7 @@ interface TMatch {
   player1Name: string | null; player2Name: string | null;
   player1RobotName: string | null; player2RobotName: string | null;
   winnerId: number | null; winnerName: string | null;
-  isBye: boolean; status: string;
+  isBye: boolean; status: string; battleRoomId?: string | null;
 }
 interface TRound { id: number; tournamentId: number; roundNumber: number; status: string; }
 interface Tournament { id: number; name: string; status: string; currentRound: number; totalRounds: number; winnerId: number | null; activeMatchId: number | null; }
@@ -34,10 +35,12 @@ function matchTop(round: number, idx: number) {
 
 // ── Match Card ───────────────────────────────────────────────────────────────
 function MatchCard({
-  match, isCurrentRound, onWin, isFinal,
+  match, isCurrentRound, onWin, isFinal, myRobotName
 }: {
-  match: TMatch | null; isCurrentRound: boolean; onWin?: (matchId: number, wId: number, wName: string) => void; isFinal?: boolean;
+  match: TMatch | null; isCurrentRound: boolean; onWin?: (matchId: number, wId: number, wName: string) => void; isFinal?: boolean; myRobotName: string | null;
 }) {
+  const [, setLocation] = useLocation();
+
   if (!match) {
     return (
       <div
@@ -82,6 +85,17 @@ function MatchCard({
           : "border-white/[0.07] bg-black/20"
       }`}
     >
+      {/* Enter Arena button for current player */}
+      {!isFinished && match.battleRoomId && (myRobotName === match.player1Name || myRobotName === match.player2Name) && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm group hover:bg-black/90 transition-colors cursor-pointer"
+             onClick={() => setLocation(`/battle/${match.battleRoomId}`)}>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-black font-display font-bold text-[10px] uppercase tracking-widest rounded-sm scale-95 group-hover:scale-100 transition-transform">
+            <Swords className="w-3 h-3" />
+            Enter Arena
+          </button>
+        </div>
+      )}
+
       {/* Active pulse */}
       {isCurrentRound && !isFinished && (
         <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2, repeat: Infinity }} className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
@@ -116,11 +130,11 @@ function MatchCard({
 
 // ── Bracket Column ───────────────────────────────────────────────────────────
 function BracketColumn({
-  round, matches, totalMatchesInRound1PerSide, currentRound, onWin, isFinal, reversed,
+  round, matches, totalMatchesInRound1PerSide, currentRound, onWin, isFinal, reversed, myRobotName
 }: {
   round: number; matches: TMatch[]; totalMatchesInRound1PerSide: number;
   currentRound: number; onWin: (matchId: number, wId: number, wName: string) => void;
-  isFinal?: boolean; reversed?: boolean;
+  isFinal?: boolean; reversed?: boolean; myRobotName: string | null;
 }) {
   const matchCount = totalMatchesInRound1PerSide / Math.pow(2, round - 1);
   const colHeight = totalMatchesInRound1PerSide * BASE_UNIT;
@@ -141,7 +155,7 @@ function BracketColumn({
 
         return (
           <div key={idx} className="absolute" style={{ top, left: 0 }}>
-            <MatchCard match={match} isCurrentRound={round === currentRound} onWin={onWin} isFinal={isFinal} />
+            <MatchCard match={match} isCurrentRound={round === currentRound} onWin={onWin} isFinal={isFinal} myRobotName={myRobotName} />
 
             {/* Horizontal connector OUT (right for left-side, left for right-side) */}
             {!isFinal && matchCount > 1 && (
@@ -184,8 +198,19 @@ export function TournamentBracket({ registeredPlayers }: Props) {
   const [state, setState] = useState<TournamentState>({ tournament: null, players: [], rounds: [], matches: [] });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [myRobotName, setMyRobotName] = useState<string | null>(null);
   const [champion, setChampion] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("roboArena_robot");
+      if (s) {
+        const parsed = JSON.parse(s);
+        setMyRobotName(parsed.playerName);
+      }
+    } catch {}
+  }, []);
 
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 4000); };
 
@@ -336,41 +361,17 @@ export function TournamentBracket({ registeredPlayers }: Props) {
           <div className="relative flex items-start gap-0 min-w-max" style={{ height: colHeight }}>
 
             {/* LEFT SIDE: rounds progress left→right */}
-            {leftRounds.map((round, ri) => {
-              const lMatches = getMatches("L", round);
-              return (
-                <div key={`L-${round}`} className="relative flex-shrink-0" style={{ marginRight: 24 }}>
-                  {/* Column label */}
-                  <div className="absolute -top-8 left-0 right-0 text-center">
-                    <span className={`font-mono text-[9px] uppercase tracking-widest ${round === currentRound ? "text-primary" : "text-white/20"}`}>
-                      {round === 1 ? "Round 1" : round === totalRounds - 1 ? "Semifinals" : `Round ${round}`}
-                    </span>
-                  </div>
-                  <div className="relative" style={{ width: CARD_W, height: colHeight }}>
-                    {Array.from({ length: r1PerSide / Math.pow(2, round - 1) }).map((_, idx) => {
-                      const match = lMatches[idx] || null;
-                      const top = matchTop(round, idx);
-                      const midY = top + CARD_H / 2;
-                      const isTopOfPair = idx % 2 === 0;
-                      const pairPartnerMidY = isTopOfPair
-                        ? matchTop(round, idx + 1) + CARD_H / 2
-                        : matchTop(round, idx - 1) + CARD_H / 2;
-                      return (
-                        <div key={idx} className="absolute" style={{ top, left: 0 }}>
-                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} />
-                          {/* Horizontal stub right */}
-                          <div className="absolute top-1/2 -translate-y-1/2" style={{ left: CARD_W, width: 24, height: 1, background: match?.winnerId ? "rgba(255,69,0,0.5)" : "rgba(255,255,255,0.1)" }} />
-                          {/* Vertical connector (for top of pair) */}
-                          {isTopOfPair && idx + 1 < r1PerSide / Math.pow(2, round - 1) && (
-                            <div className="absolute" style={{ left: CARD_W + 23, top: CARD_H / 2, width: 1, height: pairPartnerMidY - midY, background: "rgba(255,255,255,0.1)" }} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+            {leftRounds.map((round, ri) => (
+              <BracketColumn
+                key={`L-${round}`}
+                round={round}
+                matches={getMatches("L", round)}
+                totalMatchesInRound1PerSide={r1PerSide}
+                currentRound={currentRound}
+                onWin={handleWin}
+                myRobotName={myRobotName}
+              />
+            ))}
 
             {/* CENTER: Final */}
             {finalRound && (
@@ -388,6 +389,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
                     isCurrentRound={currentRound === finalRound}
                     onWin={handleWin}
                     isFinal
+                    myRobotName={myRobotName}
                   />
                 </div>
               </div>
@@ -415,7 +417,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
                         : matchTop(round, idx - 1) + CARD_H / 2;
                       return (
                         <div key={idx} className="absolute" style={{ top, left: 0 }}>
-                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} />
+                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} myRobotName={myRobotName} />
                           {/* Horizontal stub left */}
                           <div className="absolute top-1/2 -translate-y-1/2" style={{ right: CARD_W, width: 24, height: 1, background: match?.winnerId ? "rgba(255,69,0,0.5)" : "rgba(255,255,255,0.1)" }} />
                           {/* Vertical connector */}

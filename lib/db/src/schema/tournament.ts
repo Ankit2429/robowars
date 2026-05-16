@@ -65,6 +65,7 @@ export const tournamentMatchesTable = pgTable("tournament_matches", {
   winnerId: integer("winner_id"),
   winnerName: text("winner_name"),
   isBye: boolean("is_bye").notNull().default(false),
+  battleRoomId: text("battle_room_id"), // link to live socket room
   status: text("status").notNull().default("pending"), // pending | active | finished | bye
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

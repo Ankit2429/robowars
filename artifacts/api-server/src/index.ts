@@ -254,7 +254,12 @@ async function ensureSchema() {
       desc: "tournament_matches.side",
       sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS side TEXT NOT NULL DEFAULT 'L'`,
     },
+    {
+      desc: "tournament_matches.battle_room_id",
+      sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS battle_room_id TEXT`,
+    },
   ];
+
 
 
   for (const m of migrations) {
