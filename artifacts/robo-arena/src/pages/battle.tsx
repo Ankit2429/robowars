@@ -29,6 +29,9 @@ interface StoredRobot {
 }
 interface PosRef { x: number; z: number }
 interface VelRef { x: number; z: number }
+
+// Opponent robot config received over socket
+let opponentRobotConfig: StoredRobot | null = null;
 interface SparkBurst { id: number; x: number; y: number; z: number; color: string }
 
 const DEFAULT_P1: StoredRobot = {
@@ -341,10 +344,12 @@ function GameController({
   const p2RpmRef      = useRef(0);
   const aiStateRef    = useRef<AIState>("chase");
   const collisionCool = useRef(0);
-  const MIN_DIST = 3.0;   // robot collision radius (units)
-  const DAMPING  = 0.60;  // high friction — stops sliding, grounded heavy movement
-  const WALL_BOUNCE = 0.55; // elastic wall rebound
-  const ROB_ELASTICITY = 3.2; // increased impulse for heavy robots
+  const MIN_DIST = 3.4;   // robot collision radius — slightly larger to prevent overlap
+  const DAMPING  = 0.72;  // tuned friction — responsive but grounded
+  const WALL_BOUNCE = 0.65; // stronger wall rebound — robots bounce off walls
+  const ROB_ELASTICITY = 4.0; // strong elastic impulse on collision
+  const MAX_SPEED = 28;   // velocity magnitude cap
+  const stuckTimerRef = useRef(0); // anti-stuck escalation timer
 
   useFrame((_, delta) => {
     if (!gameActive) return;
@@ -356,15 +361,25 @@ function GameController({
     p2PosRef.current.x += p2VelRef.current.x * dt;
     p2PosRef.current.z += p2VelRef.current.z * dt;
 
-    // ── Wall collision — elastic bounce
+    // ── Wall collision — strong knockback bounce (robots must NOT stick to walls)
     const wallBounce = (pos: PosRef, vel: VelRef) => {
-      if (pos.x >  ARENA_X) { pos.x =  ARENA_X; vel.x = -Math.abs(vel.x) * WALL_BOUNCE; }
-      if (pos.x < -ARENA_X) { pos.x = -ARENA_X; vel.x =  Math.abs(vel.x) * WALL_BOUNCE; }
-      if (pos.z >  ARENA_Z) { pos.z =  ARENA_Z; vel.z = -Math.abs(vel.z) * WALL_BOUNCE; }
-      if (pos.z < -ARENA_Z) { pos.z = -ARENA_Z; vel.z =  Math.abs(vel.z) * WALL_BOUNCE; }
+      const WALL_PUSH = 1.5; // push robot inward on contact
+      const MIN_BOUNCE = 8;  // minimum bounce-back velocity
+      if (pos.x >  ARENA_X) { pos.x = ARENA_X - WALL_PUSH; vel.x = -Math.max(Math.abs(vel.x) * WALL_BOUNCE, MIN_BOUNCE); }
+      if (pos.x < -ARENA_X) { pos.x = -ARENA_X + WALL_PUSH; vel.x = Math.max(Math.abs(vel.x) * WALL_BOUNCE, MIN_BOUNCE); }
+      if (pos.z >  ARENA_Z) { pos.z = ARENA_Z - WALL_PUSH; vel.z = -Math.max(Math.abs(vel.z) * WALL_BOUNCE, MIN_BOUNCE); }
+      if (pos.z < -ARENA_Z) { pos.z = -ARENA_Z + WALL_PUSH; vel.z = Math.max(Math.abs(vel.z) * WALL_BOUNCE, MIN_BOUNCE); }
     };
     wallBounce(p1PosRef.current, p1VelRef.current);
     wallBounce(p2PosRef.current, p2VelRef.current);
+
+    // ── Clamp max speed (prevents runaway velocities)
+    const clampVel = (vel: VelRef) => {
+      const spd = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+      if (spd > MAX_SPEED) { vel.x = (vel.x / spd) * MAX_SPEED; vel.z = (vel.z / spd) * MAX_SPEED; }
+    };
+    clampVel(p1VelRef.current);
+    clampVel(p2VelRef.current);
 
     // ── Damping
     const damp = Math.pow(DAMPING, dt * 60);
@@ -426,49 +441,54 @@ function GameController({
       }
     }
 
-    // ── Robot–robot collision: separate EVERY frame, impulse on contact
+    // ── Robot–robot collision: iterative solver with anti-stuck ──────────────
     const cdx   = p1PosRef.current.x - p2PosRef.current.x;
     const cdz   = p1PosRef.current.z - p2PosRef.current.z;
     const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
     if (cdist < MIN_DIST && cdist > 0.001) {
       const nx  = cdx / cdist, nz = cdz / cdist;
       const overlap = (MIN_DIST - cdist);
-      // Push apart by full overlap each frame — hard position correction
-      p1PosRef.current.x += nx * overlap * 0.6;
-      p1PosRef.current.z += nz * overlap * 0.6;
-      p2PosRef.current.x -= nx * overlap * 0.6;
-      p2PosRef.current.z -= nz * overlap * 0.6;
-      wallBounce(p1PosRef.current, p1VelRef.current);
-      wallBounce(p2PosRef.current, p2VelRef.current);
-      // Velocity impulse (elastic) — always apply, no cooldown gate
+
+      // HARD position correction — push apart by FULL overlap immediately
+      const pushFactor = 0.55;
+      p1PosRef.current.x += nx * overlap * pushFactor;
+      p1PosRef.current.z += nz * overlap * pushFactor;
+      p2PosRef.current.x -= nx * overlap * pushFactor;
+      p2PosRef.current.z -= nz * overlap * pushFactor;
+
+      // Elastic velocity impulse along collision normal
       const relVN = (p1VelRef.current.x - p2VelRef.current.x) * nx +
                     (p1VelRef.current.z - p2VelRef.current.z) * nz;
-      if (relVN > 0) {
-        const imp = relVN * ROB_ELASTICITY;
-        p1VelRef.current.x -= imp * nx; p1VelRef.current.z -= imp * nz;
-        p2VelRef.current.x += imp * nx; p2VelRef.current.z += imp * nz;
+      const imp = Math.max(relVN, 0) * ROB_ELASTICITY + 3.0; // minimum impulse always applied
+      p1VelRef.current.x += nx * imp * 0.5;
+      p1VelRef.current.z += nz * imp * 0.5;
+      p2VelRef.current.x -= nx * imp * 0.5;
+      p2VelRef.current.z -= nz * imp * 0.5;
+
+      // Anti-stuck: escalating separation force if overlapping for too long
+      stuckTimerRef.current += dt;
+      if (stuckTimerRef.current > 0.3) {
+        const escalation = Math.min(stuckTimerRef.current * 30, 50); // ramps up to 50
+        p1VelRef.current.x += nx * escalation;
+        p1VelRef.current.z += nz * escalation;
+        p2VelRef.current.x -= nx * escalation;
+        p2VelRef.current.z -= nz * escalation;
       }
-      // Sticky-escape: if robots are barely moving relative to each other,
-      // fire a random lateral kick to break the deadlock
-      const relSpeed = Math.abs(relVN) + Math.abs(
-        (p1VelRef.current.x - p2VelRef.current.x) * nz -
-        (p1VelRef.current.z - p2VelRef.current.z) * nx
-      );
-      if (relSpeed < 1.5) {
-        const kick = 12.0;
-        const angle = Math.random() * Math.PI * 2;
-        p1VelRef.current.x += Math.cos(angle) * kick;
-        p1VelRef.current.z += Math.sin(angle) * kick;
-        p2VelRef.current.x -= Math.cos(angle) * kick;
-        p2VelRef.current.z -= Math.sin(angle) * kick;
-      }
+
+      wallBounce(p1PosRef.current, p1VelRef.current);
+      wallBounce(p2PosRef.current, p2VelRef.current);
+
+      // Sparks on collision
       collisionCool.current = Math.max(0, collisionCool.current - dt);
       if (collisionCool.current <= 0) {
-        collisionCool.current = 0.12;
+        collisionCool.current = 0.1;
         const cx = (p1PosRef.current.x + p2PosRef.current.x) / 2;
         const cz = (p1PosRef.current.z + p2PosRef.current.z) / 2;
         onSparks(cx, 0.8, cz, "#FF8844");
       }
+    } else {
+      // Reset stuck timer when not overlapping
+      stuckTimerRef.current = 0;
     }
 
     moveEmitTimer.current += dt;
@@ -574,9 +594,10 @@ export default function Battle() {
   }, []);
   const aiRobot = DEFAULT_AI;
 
-  const [p1Hp, setP1Hp]             = useState(100);
-  const [p2Hp, setP2Hp]             = useState(100);
-  const [timeLeft, setTimeLeft]     = useState(90);
+  const [p1Hp, setP1Hp]             = useState(200);
+  const [p2Hp, setP2Hp]             = useState(200);
+  const [timeLeft, setTimeLeft]     = useState(120);
+  const [opponentRobot, setOpponentRobot] = useState<StoredRobot>(DEFAULT_AI);
   const [gameStatus, setGameStatus] = useState<"waiting" | "starting" | "playing" | "ended">("waiting");
   const [winner, setWinner]         = useState<"p1" | "p2" | null>(null);
   const [p2Name, setP2Name]         = useState(isAI ? aiRobot.playerName : "OPPONENT");
@@ -704,10 +725,34 @@ export default function Battle() {
       forceNew: true,
     });
     socketRef.current = socket;
-    socket.on("connect", () => { socket.emit("joinRoom", { roomId, playerName: myRobot.playerName }); });
+    socket.on("connect", () => {
+      // Send OUR full robot config so opponent receives it
+      socket.emit("joinRoom", {
+        roomId,
+        playerName: myRobot.playerName,
+        robotConfig: {
+          playerName: myRobot.playerName,
+          robotName: myRobot.robotName,
+          bodyColor: myRobot.bodyColor,
+          attackColor: myRobot.attackColor,
+          defenseColor: myRobot.defenseColor,
+          attackPartId: myRobot.attackPartId,
+          bodyPartId: myRobot.bodyPartId,
+          defensePartId: myRobot.defensePartId,
+          secondaryWeaponId: myRobot.secondaryWeaponId,
+          stats: myRobot.stats,
+        },
+      });
+    });
     socket.on("battleStart", ({ players }: any) => {
       const opp = players.find((p: any) => p.playerName !== myRobot.playerName);
-      if (opp) setP2Name(opp.playerName);
+      if (opp) {
+        setP2Name(opp.playerName);
+        // Load opponent's REAL robot config if provided
+        if (opp.robotConfig) {
+          setOpponentRobot(opp.robotConfig);
+        }
+      }
     });
     socket.on("opponentMove", ({ x, z }: { x: number; z: number }) => { p2PosRef.current = { x, z }; });
     socket.on("attackResult", ({ defenderName, damage, defenderHp, hit }: any) => {
@@ -999,7 +1044,7 @@ export default function Battle() {
               />
               <ArenaRobot
                 posRef={p2PosRef} targetPosRef={p1PosRef} velRef={p2VelRef}
-                config={isAI ? aiRobot : { ...myRobot, playerName: p2Name, bodyColor: "#003380", attackColor: "#0055cc", defenseColor: "#001a55" }}
+                config={isAI ? aiRobot : opponentRobot}
                 isAttacking={p2Attacking} isHit={p2Hit}
               />
               {sparkBursts.map(b => <ImpactFlash key={b.id} x={b.x} y={b.y} z={b.z} color={b.color} />)}
@@ -1146,11 +1191,7 @@ export default function Battle() {
                   className="brutal-border px-6 py-3 font-display font-bold uppercase tracking-widest text-white hover:bg-primary/20 transition-colors">
                   Upgrade Robot
                 </button>
-                <button onClick={() => setLocation("/battle/ai")}
-                  className="brutal-border px-6 py-3 font-display font-bold uppercase tracking-widest text-primary border-primary hover:bg-primary hover:text-black transition-colors">
-                  Rematch
-                </button>
-                <button onClick={() => setLocation("/")}
+                <button onClick={() => setLocation("/builder")}
                   className="px-6 py-3 font-mono text-sm uppercase tracking-widest text-muted-foreground hover:text-white border border-border hover:border-primary transition-colors">
                   Menu
                 </button>

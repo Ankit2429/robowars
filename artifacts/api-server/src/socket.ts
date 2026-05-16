@@ -10,6 +10,7 @@ interface Player {
   socketId: string;
   playerName: string;
   robotId?: number;
+  robotConfig?: any; // full robot build config from client
   hp: number;
   roomId: string;
   x: number;
@@ -273,8 +274,8 @@ export function setupSocketIO(server: HttpServer) {
     });
 
     // ── Room join ────────────────────────────────────────────────────────────
-    socket.on("joinRoom", async ({ roomId, playerName, robotId }: { roomId: string; playerName: string; robotId?: number }) => {
-      logger.info({ socketId: socket.id, roomId, playerName }, "joinRoom received");
+    socket.on("joinRoom", async ({ roomId, playerName, robotId, robotConfig }: { roomId: string; playerName: string; robotId?: number; robotConfig?: any }) => {
+      logger.info({ socketId: socket.id, roomId, playerName, hasRobotConfig: !!robotConfig }, "joinRoom received");
       socket.join(roomId);
 
       if (!rooms.has(roomId)) {
@@ -284,7 +285,11 @@ export function setupSocketIO(server: HttpServer) {
       const room = rooms.get(roomId)!;
       const existing = room.players.find(p => p.socketId === socket.id);
       if (!existing) {
-        room.players.push({ socketId: socket.id, playerName, robotId, hp: 100, roomId, x: room.players.length === 0 ? -5 : 5, z: 0 });
+        room.players.push({
+          socketId: socket.id, playerName, robotId, robotConfig,
+          hp: 200, roomId,
+          x: room.players.length === 0 ? -10 : 10, z: 0,
+        });
       }
 
       try {
@@ -303,7 +308,10 @@ export function setupSocketIO(server: HttpServer) {
           await db.update(roomsTable).set({ status: "fighting" }).where(eq(roomsTable.id, roomId));
         } catch (err) { logger.error({ err }, "Failed to update room status"); }
         io.to(roomId).emit("battleStart", {
-          players: room.players.map(p => ({ playerName: p.playerName, hp: p.hp, robotId: p.robotId })),
+          players: room.players.map(p => ({
+            playerName: p.playerName, hp: p.hp, robotId: p.robotId,
+            robotConfig: p.robotConfig, // send opponent's REAL robot config
+          })),
         });
       }
 
