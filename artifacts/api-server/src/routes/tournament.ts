@@ -60,7 +60,7 @@ function buildBracket(players: { id: number; pilotName: string; robotName: strin
 router.get("/tournament", async (req, res) => {
   try {
     const tournaments = await db.select().from(tournamentsTable).orderBy(desc(tournamentsTable.id)).limit(1);
-    if (tournaments.length === 0) { res.json({ tournament: null }); return; }
+    if (tournaments.length === 0) { res.json({ tournament: null, players: [], rounds: [], matches: [] }); return; }
 
     const tournament = tournaments[0];
     const players = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.tournamentId, tournament.id));

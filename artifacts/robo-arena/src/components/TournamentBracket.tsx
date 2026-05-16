@@ -201,14 +201,16 @@ export function TournamentBracket({ registeredPlayers }: Props) {
 
   const loadTournament = useCallback(async () => {
     try {
+      console.log("[Tournament] Loading data...");
       const data = await customFetch<TournamentState>("/api/tournament");
+      console.log("[Tournament] Received data:", data);
       setState(data);
       if (data.tournament?.status === "finished" && data.tournament.winnerId) {
-        const winner = data.players.find(p => p.id === data.tournament!.winnerId);
+        const winner = data.players?.find(p => p.id === data.tournament!.winnerId);
         if (winner) setChampion(winner.pilotName);
       }
     } catch (e) {
-      console.error("Failed to load tournament", e);
+      console.error("[Tournament] Failed to load tournament:", e);
     }
   }, []);
 
@@ -308,7 +310,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
     }
   };
 
-  const { tournament, matches, rounds } = state;
+  const { tournament, matches = [], rounds = [] } = state;
   const allRoundNumbers = [...new Set(matches.map(m => m.roundNumber))].sort((a, b) => a - b);
   const currentRound = tournament?.currentRound ?? 0;
   const isActive = tournament?.status === "active";
