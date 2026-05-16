@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { settingsTable, accessCodesTable } from "@workspace/db";
+import { settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { globalEvents, EVENTS } from "../lib/events";
 
@@ -12,11 +12,9 @@ router.get("/settings", async (req, res) => {
     const result: Record<string, string> = {};
     settings.forEach((s: any) => { result[s.key] = s.value; });
     
-    const codes = await db.select().from(accessCodesTable);
-    
     res.json({
       matchmakingActive: result["matchmakingActive"] === "true",
-      codes: codes.map((c: any) => c.code)
+      codes: ["bot123"] // Hardcoded fallback for UI
     });
   } catch (err: any) {
     req.log.error({ err: err.message }, "Failed to get settings");
@@ -42,20 +40,6 @@ router.post("/settings/matchmaking", async (req, res) => {
   }
 });
 
-router.post("/settings/codes", async (req, res) => {
-  const { code, action } = req.body;
-  req.log.info({ code, action }, "Access code update requested");
-  try {
-    if (action === 'add') {
-      await db.insert(accessCodesTable).values({ code }).onConflictDoNothing();
-    } else {
-      await db.delete(accessCodesTable).where(eq(accessCodesTable.code, code));
-    }
-    res.json({ success: true });
-  } catch (err: any) {
-    req.log.error({ err: err.message }, "Failed to update access codes");
-    res.status(500).json({ error: "Failed to update access codes" });
-  }
-});
+// Removed /settings/codes route as access codes are hardcoded now
 
 export default router;

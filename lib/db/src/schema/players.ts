@@ -22,7 +22,4 @@ export const settingsTable = pgTable("settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const accessCodesTable = pgTable("access_codes", {
-  code: text("code").primaryKey(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+

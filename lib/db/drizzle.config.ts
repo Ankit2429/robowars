@@ -1,10 +1,13 @@
 import { defineConfig } from "drizzle-kit";
 
+if (!process.env.DATABASE_URL) {
+  console.error("DATABASE_URL is missing in environment variables for drizzle-kit");
+}
+
 export default defineConfig({
   schema: "./src/schema/index.ts",
   dialect: "postgresql",
-  driver: "pglite",
   dbCredentials: {
-    url: "../../database-pglite",
+    url: process.env.DATABASE_URL || "",
   },
 });
