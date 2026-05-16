@@ -152,7 +152,65 @@ async function ensureSchema() {
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       )`,
     },
+    {
+      name: "tournaments",
+      sql: `CREATE TABLE IF NOT EXISTS tournaments (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT 'RoboWars Tournament',
+        status TEXT NOT NULL DEFAULT 'pending',
+        current_round INTEGER NOT NULL DEFAULT 0,
+        total_rounds INTEGER NOT NULL DEFAULT 0,
+        winner_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "tournament_players",
+      sql: `CREATE TABLE IF NOT EXISTS tournament_players (
+        id SERIAL PRIMARY KEY,
+        tournament_id INTEGER NOT NULL,
+        pilot_name TEXT NOT NULL,
+        robot_name TEXT NOT NULL DEFAULT 'Unknown Robot',
+        seed INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "tournament_rounds",
+      sql: `CREATE TABLE IF NOT EXISTS tournament_rounds (
+        id SERIAL PRIMARY KEY,
+        tournament_id INTEGER NOT NULL,
+        round_number INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
+    {
+      name: "tournament_matches",
+      sql: `CREATE TABLE IF NOT EXISTS tournament_matches (
+        id SERIAL PRIMARY KEY,
+        tournament_id INTEGER NOT NULL,
+        round_id INTEGER NOT NULL,
+        round_number INTEGER NOT NULL,
+        match_number INTEGER NOT NULL,
+        player1_id INTEGER,
+        player2_id INTEGER,
+        player1_name TEXT,
+        player2_name TEXT,
+        player1_robot_name TEXT,
+        player2_robot_name TEXT,
+        winner_id INTEGER,
+        winner_name TEXT,
+        is_bye BOOLEAN NOT NULL DEFAULT false,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+    },
   ];
+
 
   for (const table of tables) {
     try {

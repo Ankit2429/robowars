@@ -6,6 +6,7 @@ import { getApiUrl } from "@/lib/api-url";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sword, LayoutDashboard, Trophy, Users, Shield, LogOut, RefreshCw, Play, Square, ArrowLeft } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { TournamentBracket } from "@/components/TournamentBracket";
 
 export default function Admin() {
   const { logout: playerLogout } = useSession();
@@ -312,58 +313,7 @@ export default function Admin() {
               )}
 
               {activeTab === "bracket" && (
-                <div className="space-y-8">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-2xl font-black uppercase tracking-widest">Tournament Ops</h2>
-                      <p className="font-mono text-xs text-muted-foreground uppercase mt-1">Combat Engagement Protocols</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <div className="bg-black/50 border border-white/5 px-4 py-2 rounded flex items-center gap-3">
-                        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">Queue</span>
-                        <span className="text-primary font-black text-lg">{queueCount}</span>
-                      </div>
-                      <button 
-                        onClick={toggleMatchmaking}
-                        className={`flex items-center gap-3 px-8 py-3 rounded font-black text-xs uppercase tracking-[0.2em] transition-all border ${matchmakingActive ? 'bg-red-500/10 border-red-500 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-green-500/10 border-green-500 text-green-500 hover:bg-green-500 hover:text-white'}`}
-                      >
-                        {matchmakingActive ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        {matchmakingActive ? 'HALT OPS' : 'INITIATE OPS'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl space-y-4">
-                      <h3 className="font-bold uppercase tracking-widest text-sm border-b border-white/5 pb-2">Tournament Status</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-mono text-[10px] text-muted-foreground uppercase">Active Combatants</span>
-                          <span className="font-mono text-xs text-white">{players.filter(p => p.status !== 'Eliminated').length}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="font-mono text-[10px] text-muted-foreground uppercase">Eliminated Units</span>
-                          <span className="font-mono text-xs text-white">{players.filter(p => p.status === 'Eliminated').length}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-6 border border-white/5 bg-white/[0.02] rounded-xl flex flex-col gap-4">
-                      <h3 className="font-bold uppercase tracking-widest text-sm border-b border-white/5 pb-2">Bracket Generation</h3>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        This action will evaluate the queue, assign BYEs to balance the bracket, and match remaining players instantly.
-                      </p>
-                      <button 
-                        onClick={handleGenerateBracket}
-                        disabled={queueCount === 0}
-                        className="mt-auto brutal-button px-6 py-3 w-full border-primary text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-30 flex justify-center items-center gap-2"
-                      >
-                        <Trophy className="w-4 h-4" /> GENERATE BRACKET & MATCH
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <TournamentBracket registeredPlayers={players.map(p => ({ name: p.name, usn: p.usn }))} />
               )}
             </motion.div>
           </AnimatePresence>

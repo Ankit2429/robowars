@@ -124,6 +124,12 @@ export function setupSocketIO(server: HttpServer) {
     io.emit("matchmakingStatusChanged", { active });
   });
 
+  // Listen for tournament updates and broadcast to all clients
+  globalEvents.on(EVENTS.TOURNAMENT_UPDATED, (tournamentId: number) => {
+    logger.info({ tournamentId }, "Tournament updated — broadcasting bracket_updated");
+    io.emit("bracket_updated", { tournamentId, timestamp: new Date().toISOString() });
+  });
+
   const broadcastDebug = () => {
     const state = getDebugState();
     io.emit("debugState", state);

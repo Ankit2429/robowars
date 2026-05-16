@@ -6,6 +6,7 @@ import roomsRouter from "./rooms";
 import leaderboardRouter from "./leaderboard";
 import playersRouter from "./players";
 import settingsRouter from "./settings";
+import tournamentRouter from "./tournament";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(roomsRouter);
 router.use(leaderboardRouter);
 router.use(playersRouter);
 router.use(settingsRouter);
+router.use(tournamentRouter);
 
 export default router;
