@@ -11,7 +11,7 @@ router.get("/leaderboard", async (req, res) => {
       .orderBy(desc(leaderboardTable.wins), desc(leaderboardTable.winRate))
       .limit(20);
 
-    const ranked = entries.map((e, i) => ({
+    const ranked = entries.map((e: any, i: number) => ({
       rank: i + 1,
       playerName: e.playerName,
       wins: e.wins,

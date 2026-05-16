@@ -67,7 +67,7 @@ router.get("/robots", async (req, res) => {
     const { waitForDB } = await import("@workspace/db");
     await waitForDB();
     const robots = await db.select().from(robotsTable).orderBy(robotsTable.createdAt);
-    res.json(robots.map(r => ({
+    res.json(robots.map((r: any) => ({
       ...r,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : new Date(r.createdAt).toISOString()
     })));

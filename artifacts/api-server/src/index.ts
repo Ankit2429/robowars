@@ -52,28 +52,35 @@ async function boot() {
 async function ensureSchema() {
   const { client } = await import("@workspace/db");
 
-  // PGlite must be fully initialized before queries
-  // waitReady is a Promise property, not a function
-  logger.info({ waitReadyType: typeof client.waitReady, clientKeys: Object.keys(client).slice(0, 10) }, "PGlite client info");
-  
+  const { isPostgres } = await import("@workspace/db");
+  const usePostgres = isPostgres();
+
   try {
-    if (client.waitReady && typeof client.waitReady.then === "function") {
+    if (usePostgres) {
+      logger.info("Verifying PostgreSQL connection...");
+      await client`SELECT 1`;
+      logger.info("PostgreSQL connection verified");
+    } else if (client.waitReady && typeof client.waitReady.then === "function") {
       logger.info("Awaiting PGlite waitReady promise...");
       await client.waitReady;
       logger.info("PGlite waitReady resolved");
     } else {
-      logger.info("No waitReady promise, trying direct query...");
+      logger.info("Testing PGlite connection...");
       await client.query("SELECT 1");
-      logger.info("PGlite direct query succeeded");
+      logger.info("PGlite connection verified");
     }
   } catch (err: any) {
-    logger.error({ err: err.message }, "PGlite initial readiness check failed, retrying in 3s...");
+    logger.error({ err: err.message }, "Database initial readiness check failed, retrying in 3s...");
     await new Promise(resolve => setTimeout(resolve, 3000));
     try {
-      await client.query("SELECT 1");
-      logger.info("PGlite retry query succeeded");
+      if (usePostgres) {
+        await client`SELECT 1`;
+      } else {
+        await client.query("SELECT 1");
+      }
+      logger.info("Database retry query succeeded");
     } catch (err2: any) {
-      logger.error({ err: err2.message }, "PGlite STILL failing after retry");
+      logger.error({ err: err2.message }, "Database STILL failing after retry");
     }
   }
 
@@ -149,7 +156,12 @@ async function ensureSchema() {
 
   for (const table of tables) {
     try {
-      await client.query(table.sql);
+      if (usePostgres) {
+        // postgres.js uses tagged templates
+        await client.unsafe(table.sql);
+      } else {
+        await client.query(table.sql);
+      }
       logger.info({ table: table.name }, "Table ensured");
     } catch (err: any) {
       logger.error({ table: table.name, err: err.message, stack: err.stack }, "FAILED to create table");

@@ -10,7 +10,7 @@ router.get("/rooms", async (req, res) => {
   try {
     const rooms = await db.select().from(roomsTable)
       .orderBy(roomsTable.createdAt);
-    res.json(rooms.map(r => ({
+    res.json(rooms.map((r: any) => ({
       ...r,
       createdAt: r.createdAt.toISOString(),
     })));

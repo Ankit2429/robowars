@@ -146,7 +146,7 @@ export function setupSocketIO(server: HttpServer) {
           status: "waiting",
           playerCount: 0,
           maxPlayers: 2,
-        }).catch(err => logger.error({ err }, "Failed to insert match room into DB"));
+        }).catch((err: any) => logger.error({ err }, "Failed to insert match room into DB"));
       } else {
         logger.info({ playerName, queueLength: matchQueue.length }, "Waiting for opponent — emitting matchSearching");
         socket.emit("matchSearching");

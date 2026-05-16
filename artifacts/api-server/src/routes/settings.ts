@@ -10,13 +10,13 @@ router.get("/settings", async (req, res) => {
   try {
     const settings = await db.select().from(settingsTable);
     const result: Record<string, string> = {};
-    settings.forEach(s => { result[s.key] = s.value; });
+    settings.forEach((s: any) => { result[s.key] = s.value; });
     
     const codes = await db.select().from(accessCodesTable);
     
     res.json({
       matchmakingActive: result["matchmakingActive"] === "true",
-      codes: codes.map(c => c.code)
+      codes: codes.map((c: any) => c.code)
     });
   } catch (err: any) {
     req.log.error({ err: err.message }, "Failed to get settings");

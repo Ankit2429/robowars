@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { client, waitForDB } from "@workspace/db";
+import { db, waitForDB } from "@workspace/db";
 import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -12,31 +12,6 @@ const RegisterBody = z.object({
   branch: z.string(),
   code: z.string(),
 });
-
-// Ensure the players table exists — called once on first request
-let tableEnsured = false;
-async function ensurePlayersTable() {
-  if (tableEnsured) return;
-  try {
-    await waitForDB();
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS players (
-        id SERIAL PRIMARY KEY,
-        usn TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        branch TEXT NOT NULL,
-        access_code TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'Registered',
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      )
-    `);
-    tableEnsured = true;
-    console.log("[Players] players table ensured and DB ready");
-  } catch (err: any) {
-    console.error("[Players] FAILED to ensure players table or DB not ready:", err.message);
-    throw err; // Re-throw to be caught by the route handler
-  }
-}
 
 router.post("/players/register", async (req, res): Promise<void> => {
   req.log.info({ body: req.body }, "Registration attempt received");
@@ -52,7 +27,7 @@ router.post("/players/register", async (req, res): Promise<void> => {
   const { name, usn, branch, code } = parsed.data;
   req.log.info({ name, usn, branch, code }, "Parsed registration data");
 
-  // Step 2: Validate access code (hardcoded — no DB dependency)
+  // Step 2: Validate access code (hardcoded)
   const validCodes = ['bot123'];
   if (!validCodes.includes(code)) {
     req.log.warn({ code }, "Invalid access code — rejected");
@@ -61,52 +36,55 @@ router.post("/players/register", async (req, res): Promise<void> => {
   }
   req.log.info({ code }, "Access code accepted");
 
-  // Step 2.5: Ensure table exists before any DB query
+  // Step 3: Ensure database readiness
   try {
-    await ensurePlayersTable();
+    await waitForDB();
   } catch (err: any) {
-    req.log.error({ err: err.message }, "FAILED to ensure players table in registration route");
-    res.status(500).json({ error: "Database initialization error", detail: err.message });
+    req.log.error({ err: err.message }, "Database not ready for registration");
+    res.status(500).json({ error: "Database not ready", detail: err.message });
     return;
   }
 
-  // Step 3: Check for duplicate USN using raw SQL (bypasses Drizzle ORM issues)
+  // Step 4: Check for duplicate USN using Drizzle
   try {
-    req.log.info({ usn }, "Checking for existing USN via raw SQL...");
-    const result = await client.query("SELECT id FROM players WHERE usn = $1", [usn]);
-    req.log.info({ rowCount: result.rows.length, usn }, "USN lookup result");
-    if (result.rows.length > 0) {
+    req.log.info({ usn }, "Checking for existing USN...");
+    const existing = await db.select().from(playersTable).where(eq(playersTable.usn, usn));
+    req.log.info({ existingCount: existing.length, usn }, "USN lookup result");
+    if (existing.length > 0) {
       req.log.warn({ usn }, "USN already registered — rejected");
       res.status(409).json({ error: "USN already registered" });
       return;
     }
   } catch (err: any) {
-    req.log.error({ err: err.message, stack: err.stack, usn }, "FAILED to check USN — DB error");
+    req.log.error({ err: err.message, stack: err.stack, usn }, "FAILED to check USN");
     res.status(500).json({ error: "Database error checking USN", detail: err.message });
     return;
   }
 
-  // Step 4: Insert new player using raw SQL
+  // Step 5: Insert new player using Drizzle
   try {
-    req.log.info({ name, usn, branch, code }, "Inserting new player via raw SQL...");
-    const result = await client.query(
-      "INSERT INTO players (usn, name, branch, access_code, status) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [usn, name, branch, code, "Registered"]
-    );
-    const player = result.rows[0] as any;
+    req.log.info({ name, usn, branch, code }, "Inserting new player...");
+    const [player] = await db.insert(playersTable).values({
+      name,
+      usn,
+      branch,
+      accessCode: code,
+      status: "Registered",
+    }).returning();
+
     req.log.info({ playerId: player.id, usn, name }, "Player registered successfully");
     res.status(201).json(player);
   } catch (err: any) {
-    req.log.error({ err: err.message, stack: err.stack, name, usn }, "FAILED to insert player — DB error");
+    req.log.error({ err: err.message, stack: err.stack, name, usn }, "FAILED to insert player");
     res.status(500).json({ error: "Database error inserting player", detail: err.message });
   }
 });
 
 router.get("/players", async (req, res) => {
-  await ensurePlayersTable();
   try {
-    const result = await client.query("SELECT * FROM players ORDER BY id DESC");
-    res.json(result.rows);
+    await waitForDB();
+    const players = await db.select().from(playersTable).orderBy(playersTable.id);
+    res.json(players);
   } catch (err: any) {
     req.log.error({ err: err.message, stack: err.stack }, "FAILED to list players");
     res.status(500).json({ error: "Failed to list players", detail: err.message });
