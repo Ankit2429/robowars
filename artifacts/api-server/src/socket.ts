@@ -35,7 +35,7 @@ export function getDebugState() {
         playerName: s.data.playerName || null,
         inQueue: s.data.inQueue || false,
         roomId: s.data.roomId || null,
-        transport: s.conn?.transport?.name || "unknown",
+        transport: (s as any).conn?.transport?.name || "unknown",
         connected: s.connected,
       }))
     : [];
@@ -129,7 +129,7 @@ export function setupSocketIO(server: HttpServer) {
   io.on("connection", (socket) => {
     logger.info({
       socketId: socket.id,
-      transport: socket.conn.transport.name,
+      transport: (socket as any).conn?.transport?.name || "unknown",
       remoteAddress: socket.handshake.address,
       origin: socket.handshake.headers.origin || "none",
       secure: socket.handshake.secure,
@@ -141,7 +141,7 @@ export function setupSocketIO(server: HttpServer) {
     socket.conn.on("upgrade", (transport: any) => {
       logger.info({
         socketId: socket.id,
-        newTransport: transport.name,
+        newTransport: (transport as any).name || "unknown",
       }, "Socket transport UPGRADED");
     });
 
