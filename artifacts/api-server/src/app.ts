@@ -25,7 +25,11 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(cors({
+  origin: true, // Reflect the request origin
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

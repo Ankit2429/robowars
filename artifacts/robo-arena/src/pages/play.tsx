@@ -34,11 +34,12 @@ export default function Play() {
     console.log("[Play] Connecting socket to:", url);
     const socket = io(url, {
       path: "/socket.io",
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
+      withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      secure: url.startsWith("https"),
+      reconnectionDelayMax: 5000,
       forceNew: true,
     });
     socketRef.current = socket;

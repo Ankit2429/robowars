@@ -695,11 +695,12 @@ export default function Battle() {
     if (isAI) return;
     const socket = io(getApiUrl(), {
       path: "/socket.io",
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
+      withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      secure: getApiUrl().startsWith("https"),
+      reconnectionDelayMax: 5000,
       forceNew: true,
     });
     socketRef.current = socket;

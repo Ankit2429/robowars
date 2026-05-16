@@ -65,32 +65,53 @@ export function getDebugState() {
 
 // ── Setup ───────────────────────────────────────────────────────────────────
 export function setupSocketIO(server: HttpServer) {
+  // Allowed origins — Vercel production + local dev
+  const ALLOWED_ORIGINS = [
+    /\.vercel\.app$/,
+    /localhost/,
+    /127\.0\.0\.1/,
+  ];
+
   const io = new SocketIOServer(server, {
     path: "/socket.io",
     cors: {
-      origin: (origin, callback) => {
-        // Allow all origins in production, including Vercel and local dev
-        callback(null, true);
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Allow requests with no origin (e.g. server-to-server, mobile, curl)
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        // Allow any Vercel deployment, localhost, or direct IP
+        const allowed = ALLOWED_ORIGINS.some(pattern => pattern.test(origin));
+        if (allowed) {
+          callback(null, true);
+        } else {
+          // Still allow in production — log for visibility
+          logger.warn({ origin }, "Socket.IO: non-allowlisted origin, allowing anyway");
+          callback(null, true);
+        }
       },
       methods: ["GET", "POST"],
       credentials: true,
-      allowedHeaders: ["my-custom-header"],
     },
-    transports: ["websocket", "polling"],
-    allowEIO3: true, // Compatibility
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    // CRITICAL: Start with polling (works through all proxies), then upgrade to websocket
+    transports: ["polling", "websocket"],
+    allowUpgrades: true,
+    pingInterval: 25000,
+    pingTimeout: 20000,
+    // Allow generous upgrade timeout for Render's proxy
+    upgradeTimeout: 30000,
   });
   _io = io;
 
-  // Connection error logging
-  io.engine.on("connection_error", (err) => {
+  // ── Engine-level diagnostics ──────────────────────────────────────────────
+  io.engine.on("connection_error", (err: any) => {
     logger.error({ 
-      req: err.req.url, 
+      url: err.req?.url, 
       code: err.code, 
       message: err.message, 
       context: err.context 
-    }, "Socket.IO ENGINE connection error");
+    }, "Socket.IO ENGINE connection_error");
   });
 
   // Listen for admin changes and broadcast to all players
@@ -111,8 +132,18 @@ export function setupSocketIO(server: HttpServer) {
       transport: socket.conn.transport.name,
       remoteAddress: socket.handshake.address,
       origin: socket.handshake.headers.origin || "none",
+      secure: socket.handshake.secure,
+      query: socket.handshake.query,
       totalConnected: io.sockets.sockets.size,
     }, "Socket CONNECTED");
+
+    // Track transport upgrades (polling → websocket)
+    socket.conn.on("upgrade", (transport: any) => {
+      logger.info({
+        socketId: socket.id,
+        newTransport: transport.name,
+      }, "Socket transport UPGRADED");
+    });
 
     // Send immediate debug state to new connection
     socket.emit("debugState", getDebugState());
