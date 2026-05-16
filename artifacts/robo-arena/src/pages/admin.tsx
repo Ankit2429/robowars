@@ -70,7 +70,7 @@ export default function Admin() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (authKey === "bot123") {
+    if (authKey === "admin321") {
       setIsAuthenticated(true);
       setAuthMsg("");
     } else {

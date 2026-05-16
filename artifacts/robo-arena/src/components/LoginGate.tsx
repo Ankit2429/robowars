@@ -4,17 +4,20 @@ import { Sword, Zap, AlertTriangle } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { STARTING_POINTS } from "@/lib/session";
 import { useLocation, Link } from "wouter";
+import { customFetch } from "@workspace/api-client-react";
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isEliminated, login, logout, session } = useSession();
   const [location] = useLocation();
   const [username, setUsername] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [error, setError]       = useState("");
   const [shake, setShake]       = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Bypass for public routes
-  const publicRoutes = ["/", "/portal", "/admin"];
+  const publicRoutes = ["/", "/admin"];
   if (publicRoutes.includes(location)) {
     return <>{children}</>;
   }
@@ -58,10 +61,12 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   if (isLoggedIn) return <>{children}</>;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedUser = username.trim();
     const trimmedName = playerName.trim();
+    const trimmedCode = accessCode.trim();
+
     if (trimmedUser.length < 2) {
       setError("PILOT ID must be at least 2 characters");
       setShake(true);
@@ -74,8 +79,38 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       setTimeout(() => setShake(false), 500);
       return;
     }
+    if (trimmedCode.length < 2) {
+      setError("ACCESS CODE required");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+
+    setIsLoading(true);
     setError("");
-    login(trimmedUser, trimmedName);
+
+    try {
+      // Step 1: Register in backend DB
+      await customFetch<any>("/api/players/register", {
+        method: "POST",
+        body: JSON.stringify({ 
+          name: trimmedName, 
+          usn: trimmedUser, 
+          branch: "PILOT", // Default branch for simplified UI
+          code: trimmedCode 
+        }),
+      });
+
+      // Step 2: Login in local session context
+      login(trimmedUser, trimmedName);
+    } catch (err: any) {
+      console.error("[LoginGate] Registration failed:", err);
+      setError(err.data?.error || "Registration failed. Check access code.");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -177,6 +212,19 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
                 className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
               />
             </div>
+
+            <div>
+              <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
+                Access Code
+              </label>
+              <input
+                type="text"
+                value={accessCode}
+                onChange={e => setAccessCode(e.target.value)}
+                placeholder="bot123"
+                className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
+              />
+            </div>
           </div>
 
           {error && (
@@ -191,9 +239,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
           <button
             type="submit"
-            className="w-full py-4 font-display font-black text-xl uppercase tracking-widest border-2 border-primary text-primary bg-primary/10 hover:bg-primary hover:text-black transition-all duration-200 shadow-[0_0_24px_rgba(255,69,0,0.3)] hover:shadow-[0_0_40px_rgba(255,69,0,0.6)]"
+            disabled={isLoading}
+            className="w-full py-4 font-display font-black text-xl uppercase tracking-widest border-2 border-primary text-primary bg-primary/10 hover:bg-primary hover:text-black transition-all duration-200 shadow-[0_0_24px_rgba(255,69,0,0.3)] hover:shadow-[0_0_40px_rgba(255,69,0,0.6)] disabled:opacity-50 disabled:cursor-wait"
           >
-            INITIALIZE PILOT
+            {isLoading ? "INITIALIZING..." : "INITIALIZE PILOT"}
           </button>
         </motion.form>
 
