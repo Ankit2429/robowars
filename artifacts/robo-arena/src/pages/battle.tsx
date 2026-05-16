@@ -30,8 +30,6 @@ interface StoredRobot {
 interface PosRef { x: number; z: number }
 interface VelRef { x: number; z: number }
 
-// Opponent robot config received over socket
-let opponentRobotConfig: StoredRobot | null = null;
 interface SparkBurst { id: number; x: number; y: number; z: number; color: string }
 
 const DEFAULT_P1: StoredRobot = {
