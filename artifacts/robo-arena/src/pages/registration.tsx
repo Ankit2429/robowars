@@ -83,7 +83,7 @@ export default function Registration() {
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-md px-6"
+        className="relative z-10 w-full max-w-lg px-8 py-10"
       >
         {/* Back link */}
         <div className="mb-6">
@@ -144,9 +144,9 @@ export default function Registration() {
           onSubmit={handleSubmit}
           animate={shake ? { x: [-8, 8, -6, 6, -4, 4, 0] } : {}}
           transition={{ duration: 0.4 }}
-          className="space-y-4"
+          className="space-y-6"
         >
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-6">
             <div>
               <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
                 Pilot ID
@@ -217,6 +217,19 @@ export default function Registration() {
           </p>
         </div>
       </motion.div>
+
+      {/* Admin Portal Access - Restored to bottom right */}
+      <div className="absolute bottom-8 right-8 z-20">
+        <Link 
+          href="/admin" 
+          className="opacity-50 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-2 group scale-90 origin-bottom-right cursor-pointer"
+        >
+          <div className="p-2.5 border border-primary/40 rounded-lg bg-primary/10 group-hover:bg-primary/20 group-hover:border-primary/80 group-hover:shadow-[0_0_15px_rgba(255,69,0,0.4)] transition-all">
+            <Sword className="h-5 w-5 text-primary" />
+          </div>
+          <span className="font-mono text-[10px] text-primary/70 uppercase tracking-[0.2em] font-bold group-hover:text-primary transition-colors">ADMIN PORTAL</span>
+        </Link>
+      </div>
     </div>
   );
 }
