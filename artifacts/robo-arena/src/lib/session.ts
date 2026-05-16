@@ -4,6 +4,7 @@ export const WIN_REWARD_PVP = 500;
 
 export interface PlayerSession {
   username: string;
+  playerName: string;
   points: number;
   wins: number;
   eliminated: boolean;
@@ -22,9 +23,10 @@ export function getSession(): PlayerSession | null {
   }
 }
 
-export function createSession(username: string): PlayerSession {
+export function createSession(username: string, playerName: string): PlayerSession {
   const session: PlayerSession = {
     username: username.trim().toUpperCase(),
+    playerName: playerName.trim(),
     points: STARTING_POINTS,
     wins: 0,
     eliminated: false,

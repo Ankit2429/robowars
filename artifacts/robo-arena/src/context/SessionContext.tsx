@@ -9,7 +9,7 @@ interface SessionContextValue {
   session: PlayerSession | null;
   isLoggedIn: boolean;
   isEliminated: boolean;
-  login: (username: string) => PlayerSession;
+  login: (username: string, playerName: string) => PlayerSession;
   logout: () => void;
   recordWin: (isAI: boolean) => PlayerSession;
   recordLoss: () => PlayerSession;
@@ -25,13 +25,13 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<PlayerSession | null>(() => getSession());
 
-  const login = useCallback((username: string): PlayerSession => {
+  const login = useCallback((username: string, playerName: string): PlayerSession => {
     const existing = getSession();
     if (existing && existing.username === username.trim().toUpperCase()) {
       setSession(existing);
       return existing;
     }
-    const newSession = createSession(username);
+    const newSession = createSession(username, playerName);
     setSession(newSession);
     return newSession;
   }, []);

@@ -9,6 +9,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isEliminated, login, logout, session } = useSession();
   const [location] = useLocation();
   const [username, setUsername] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const [error, setError]       = useState("");
   const [shake, setShake]       = useState(false);
 
@@ -59,21 +60,22 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = username.trim();
-    if (trimmed.length < 2) {
+    const trimmedUser = username.trim();
+    const trimmedName = playerName.trim();
+    if (trimmedUser.length < 2) {
       setError("PILOT ID must be at least 2 characters");
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
-    if (trimmed.length > 16) {
-      setError("PILOT ID must be 16 characters or less");
+    if (trimmedName.length < 2) {
+      setError("PLAYER NAME must be at least 2 characters");
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
     setError("");
-    login(trimmed);
+    login(trimmedUser, trimmedName);
   };
 
   return (
@@ -98,7 +100,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             <Sword className="h-8 w-8 text-primary" />
           </div>
           <h1 className="font-display text-6xl font-black tracking-tighter text-white drop-shadow-[0_0_20px_rgba(255,69,0,0.5)]">
-            ROBO<span className="text-primary">ARENA</span>
+            ROBO<span className="text-primary">WARS</span>
           </h1>
           <p className="font-mono text-muted-foreground tracking-widest text-xs mt-2 uppercase">
             Combat Registration System
@@ -146,29 +148,46 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.4 }}
           className="space-y-4"
         >
-          <div>
-            <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
-              Pilot ID
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="ENTER CALLSIGN..."
-              maxLength={16}
-              autoFocus
-              className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
-            />
-            {error && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="font-mono text-xs text-[#ff4444] mt-2 flex items-center gap-1"
-              >
-                <AlertTriangle className="h-3 w-3" /> {error}
-              </motion.p>
-            )}
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
+                Pilot ID
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="ENTER CALLSIGN..."
+                maxLength={16}
+                autoFocus
+                className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="font-mono text-xs uppercase tracking-widest text-muted-foreground block mb-2">
+                Player Name
+              </label>
+              <input
+                type="text"
+                value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                placeholder="REAL NAME..."
+                maxLength={32}
+                className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
+              />
+            </div>
           </div>
+
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="font-mono text-xs text-[#ff4444] mt-2 flex items-center gap-1"
+            >
+              <AlertTriangle className="h-3 w-3" /> {error}
+            </motion.p>
+          )}
 
           <button
             type="submit"
@@ -186,6 +205,19 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </p>
         </div>
       </motion.div>
+
+      {/* Admin Portal Access */}
+      <div className="absolute bottom-6 right-6 z-20">
+        <a 
+          href="/admin" 
+          className="opacity-20 hover:opacity-100 transition-all duration-300 flex flex-col items-center gap-1 group scale-75 origin-bottom-right"
+        >
+          <div className="p-2 border border-primary/30 rounded bg-primary/5 group-hover:bg-primary/10 group-hover:border-primary/60 group-hover:shadow-[0_0_10px_rgba(255,69,0,0.3)]">
+            <Sword className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-mono text-[8px] text-primary/50 uppercase tracking-tighter group-hover:text-primary">ADMIN PORTAL</span>
+        </a>
+      </div>
     </div>
   );
 }
