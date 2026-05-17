@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   tournamentsTable, tournamentPlayersTable,
   tournamentRoundsTable, tournamentMatchesTable,
+  playersTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { globalEvents, EVENTS } from "../lib/events";
@@ -290,8 +291,22 @@ router.post("/tournament/declare-winner", async (req, res) => {
 
     await db.update(tournamentMatchesTable).set({ winnerId, winnerName, status: "finished" }).where(eq(tournamentMatchesTable.id, matchId));
 
+    // Mark loser as eliminated in both tournament table AND the main players table (Pilot ID record)
     const loserId = match.player1Id === winnerId ? match.player2Id : match.player1Id;
-    if (loserId) await db.update(tournamentPlayersTable).set({ status: "eliminated" }).where(eq(tournamentPlayersTable.id, loserId));
+    if (loserId) {
+      await db.update(tournamentPlayersTable).set({ status: "eliminated" }).where(eq(tournamentPlayersTable.id, loserId));
+      // Find the loser's pilot name and mark their main player record as Eliminated
+      const [loserTournPlayer] = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.id, loserId));
+      if (loserTournPlayer?.pilotName) {
+        // pilotName matches the 'usn' (Pilot ID) stored in playersTable
+        await db
+          .update(playersTable)
+          .set({ status: "Eliminated" })
+          .where(eq(playersTable.usn, loserTournPlayer.pilotName))
+          .catch(() => { /* player may not be in main table — that's ok */ });
+        logger.info({ pilotName: loserTournPlayer.pilotName }, "Pilot eliminated — main player record flagged");
+      }
+    }
 
     globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, match.tournamentId);
     res.json({ success: true });

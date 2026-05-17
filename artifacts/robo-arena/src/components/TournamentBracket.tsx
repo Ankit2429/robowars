@@ -25,6 +25,7 @@ interface Props { registeredPlayers: Array<{ name: string; usn: string }>; }
 // ── Constants ────────────────────────────────────────────────────────────────
 const CARD_W = 188;
 const CARD_H = 72;
+const COL_GAP = 48;
 const BASE_UNIT = CARD_H + 16; // slot height for round 1
 
 function slotHeight(round: number) { return Math.pow(2, round - 1) * BASE_UNIT; }
@@ -205,7 +206,10 @@ export function TournamentBracket({ registeredPlayers }: Props) {
   const [msg, setMsg] = useState("");
   const [myRobotName, setMyRobotName] = useState<string | null>(null);
   const [champion, setChampion] = useState<string | null>(null);
+  const [bracketScale, setBracketScale] = useState(1);
   const socketRef = useRef<Socket | null>(null);
+  const bracketWrapRef = useRef<HTMLDivElement>(null);
+  const bracketInnerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -239,6 +243,24 @@ export function TournamentBracket({ registeredPlayers }: Props) {
     socket.on("bracket_updated", loadTournament);
     return () => { socket.disconnect(); };
   }, [loadTournament]);
+
+  // ── Scale-to-fit: measure bracket natural width vs container and scale down
+  useEffect(() => {
+    const updateScale = () => {
+      if (!bracketWrapRef.current || !bracketInnerRef.current) return;
+      const available = bracketWrapRef.current.clientWidth - 32; // 16px padding each side
+      const natural = bracketInnerRef.current.scrollWidth;
+      if (natural > available) {
+        setBracketScale(Math.max(0.3, available / natural));
+      } else {
+        setBracketScale(1);
+      }
+    };
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    if (bracketWrapRef.current) ro.observe(bracketWrapRef.current);
+    return () => ro.disconnect();
+  }, [state.matches]);
 
   const handleStart = async () => {
     if (registeredPlayers.length < 2) { flash("❌ Need at least 2 registered players"); return; }
@@ -362,8 +384,23 @@ export function TournamentBracket({ registeredPlayers }: Props) {
 
       {/* Bracket View */}
       {tournament && matches.length > 0 && (
-        <div className="overflow-x-auto pb-12 pt-12 custom-scrollbar">
-          <div className="relative flex items-start justify-center min-w-max mx-auto" style={{ height: colHeight, gap: 48 }}>
+        <div
+          ref={bracketWrapRef}
+          className="w-full pt-12 pb-12"
+          style={{ overflow: "hidden", minHeight: colHeight * bracketScale + 96 }}
+        >
+          {/* Scale-to-fit inner wrapper — transforms so bracket always fits on screen */}
+          <div
+            ref={bracketInnerRef}
+            className="relative flex items-start justify-center mx-auto"
+            style={{
+              height: colHeight,
+              gap: COL_GAP,
+              transformOrigin: "top center",
+              transform: `scale(${bracketScale})`,
+              width: "max-content",
+            }}
+          >
 
             {/* LEFT SIDE: rounds progress left→right */}
             <div className="flex gap-12">

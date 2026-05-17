@@ -82,15 +82,29 @@ export default function Admin() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authKey === "admin321") {
-      setIsAuthenticated(true);
-      setAuthMsg("");
-    } else {
+    setIsLoading(true);
+    try {
+      // Validate admin code server-side — never exposed in client bundle
+      const res = await customFetch<{ valid: boolean }>("/api/admin/verify", {
+        method: "POST",
+        body: JSON.stringify({ code: authKey }),
+      });
+      if (res.valid) {
+        setIsAuthenticated(true);
+        setAuthMsg("");
+      } else {
+        setAuthMsg("INVALID ACCESS CODE");
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+      }
+    } catch {
       setAuthMsg("INVALID ACCESS CODE");
       setShake(true);
       setTimeout(() => setShake(false), 500);
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -107,6 +107,7 @@ router.get("/players", async (req, res) => {
     res.status(500).json({ error: "Failed to list players", detail: err.message });
   }
 });
+
 // ── DELETE /api/players/clear — wipe ALL players ──────────────────────────────
 router.delete("/players/clear", async (req, res) => {
   try {
@@ -119,6 +120,32 @@ router.delete("/players/clear", async (req, res) => {
     req.log.error({ err: err.message, stack: err.stack }, "FAILED to clear players");
     res.status(500).json({ error: "Failed to clear players", detail: err.message });
   }
+});
+
+// ── POST /api/players/eliminate — mark pilot as Eliminated and wipe their data ─
+router.post("/players/eliminate", async (req, res): Promise<void> => {
+  const { usn } = req.body as { usn: string };
+  if (!usn) { res.status(400).json({ error: "usn required" }); return; }
+  try {
+    await waitForDB();
+    // Mark status as Eliminated in players table
+    await db.update(playersTable).set({ status: "Eliminated" }).where(eq(playersTable.usn, usn));
+    // Zero out leaderboard so they can't accumulate points while eliminated
+    await db.update(leaderboardTable).set({ points: 0 }).where(eq(leaderboardTable.playerName, usn));
+    req.log.info({ usn }, "Pilot eliminated — record flagged");
+    res.json({ success: true });
+  } catch (err: any) {
+    req.log.error({ err: err.message }, "Failed to eliminate pilot");
+    res.status(500).json({ error: "Failed to eliminate pilot", detail: err.message });
+  }
+});
+
+// ── POST /api/admin/verify — validate admin access code server-side ───────────
+// The actual code is ONLY stored here on the server — never sent to the client.
+router.post("/admin/verify", (req, res) => {
+  const { code } = req.body as { code: string };
+  const ADMIN_CODE = process.env["ADMIN_CODE"] || "admin321";
+  res.json({ valid: code === ADMIN_CODE });
 });
 
 export default router;
