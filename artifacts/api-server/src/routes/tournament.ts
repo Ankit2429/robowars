@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   tournamentsTable, tournamentPlayersTable,
   tournamentRoundsTable, tournamentMatchesTable,
-  playersTable,
+  playersTable, leaderboardTable
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { globalEvents, EVENTS } from "../lib/events";
@@ -27,7 +27,7 @@ function buildRound1Bracket(players: Player[]) {
   if (count < 2) return null;
 
   const nextPow2 = Math.pow(2, Math.ceil(Math.log2(count)));
-  const totalRounds = Math.log2(nextPow2);
+  const totalRounds = Math.max(2, Math.log2(nextPow2)); // Enforce min 2 rounds for split side layouts
   const numByes = nextPow2 - count;
 
   // Pad with nulls (BYEs) at the start so top seeds get them
@@ -157,7 +157,42 @@ export async function tryAutoAdvance(tournamentId: number) {
     // Champion!
     const champ = winnersList[0]?.player;
     await db.update(tournamentsTable).set({ status: "finished", winnerId: champ?.id ?? null }).where(eq(tournamentsTable.id, tournamentId));
-    if (champ) await db.update(tournamentPlayersTable).set({ status: "winner" }).where(eq(tournamentPlayersTable.id, champ.id));
+    if (champ) {
+      await db.update(tournamentPlayersTable).set({ status: "winner" }).where(eq(tournamentPlayersTable.id, champ.id));
+      
+      // Permanently update Pilot ID leaderboard stats
+      try {
+        const [lb] = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, champ.pilotName));
+        const wins = (lb?.wins ?? 0) + 1;
+        const points = (lb?.points ?? 1000) + 1500; // Grand Tournament Champion points reward!
+        const credits = (lb?.credits ?? 0) + 500; // credits reward
+        const totalBattles = (lb?.totalBattles ?? 0) + 1;
+        
+        if (lb) {
+          await db.update(leaderboardTable).set({
+            wins,
+            points,
+            credits,
+            totalBattles,
+            winRate: wins / totalBattles,
+            updatedAt: new Date()
+          }).where(eq(leaderboardTable.playerName, champ.pilotName));
+        } else {
+          await db.insert(leaderboardTable).values({
+            playerName: champ.pilotName,
+            wins: 1,
+            losses: 0,
+            totalBattles: 1,
+            winRate: 1.0,
+            points,
+            credits
+          });
+        }
+        logger.info({ pilotName: champ.pilotName, points, credits }, "Tournament Champion crowned and saved permanently to leaderboardTable!");
+      } catch (err: any) {
+        logger.error({ err: err.message, pilotName: champ.pilotName }, "Failed to update leaderboard stats for tournament champion");
+      }
+    }
     globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, tournamentId);
     return;
   }
@@ -230,7 +265,7 @@ router.post("/tournament/start", async (req, res) => {
 
     const count = players.length;
     const nextPow2 = Math.pow(2, Math.ceil(Math.log2(count)));
-    const totalRounds = Math.log2(nextPow2);
+    const totalRounds = Math.max(2, Math.log2(nextPow2));
 
     const [tournament] = await db.insert(tournamentsTable).values({
       name: "RoboWars Tournament",
