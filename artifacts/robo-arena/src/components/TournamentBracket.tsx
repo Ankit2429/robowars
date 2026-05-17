@@ -255,14 +255,24 @@ export function TournamentBracket({ registeredPlayers }: Props) {
       // Subtract sidebar width (280px), gap (32px), main page paddings (64px), card paddings (64px)
       const available = Math.max(300, parentMax - 450); 
       
-      // Temporary revert width to max-content to get true natural scrollWidth
-      bracketInnerRef.current.style.width = "max-content";
-      const natural = bracketInnerRef.current.scrollWidth;
+      // Calculate unscaled natural width of the bracket diagram purely mathematically
+      const leftLen = leftRounds.length;
+      const rightLen = rightRounds.length;
+      const leftW = leftLen > 0 ? leftLen * 188 + (leftLen - 1) * 48 : 0;
+      const rightW = rightLen > 0 ? rightLen * 188 + (rightLen - 1) * 48 : 0;
+      const centerW = finalRound ? 252 : 0;
+      
+      let activeBlocks = 0;
+      if (leftW > 0) activeBlocks++;
+      if (centerW > 0) activeBlocks++;
+      if (rightW > 0) activeBlocks++;
+      
+      const natural = leftW + centerW + rightW + Math.max(0, activeBlocks - 1) * 48;
       
       if (natural > available) {
         const scale = Math.max(0.28, available / natural);
         setBracketScale(scale);
-        setBracketWidth(available / scale);
+        setBracketWidth(natural); // Maintain the true natural unscaled width inside
       } else {
         setBracketScale(1);
         setBracketWidth("max-content");
@@ -278,7 +288,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
       window.removeEventListener("resize", updateScale);
       ro.disconnect();
     };
-  }, [state.matches]);
+  }, [state.matches, state.tournament]);
 
   const handleStart = async () => {
     if (registeredPlayers.length < 2) { flash("❌ Need at least 2 registered players"); return; }
@@ -410,12 +420,13 @@ export function TournamentBracket({ registeredPlayers }: Props) {
           {/* Scale-to-fit inner wrapper — transforms so bracket always fits on screen */}
           <div
             ref={bracketInnerRef}
-            className="relative flex items-start justify-center mx-auto"
+            className="relative flex items-start justify-center"
             style={{
               height: colHeight,
               gap: COL_GAP,
               transformOrigin: "top center",
-              transform: `scale(${bracketScale})`,
+              transform: `scale(${bracketScale}) translateX(-50%)`,
+              left: "50%",
               width: bracketWidth,
             }}
           >
