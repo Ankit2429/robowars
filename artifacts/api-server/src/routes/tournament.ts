@@ -26,19 +26,12 @@ function buildRound1Bracket(players: Player[]) {
   const count = players.length;
   if (count < 2) return null;
 
-  const nextPow2 = Math.pow(2, Math.ceil(Math.log2(count)));
-  const totalRounds = Math.max(2, Math.log2(nextPow2)); // Enforce min 2 rounds for split side layouts
+  const nextPow2 = Math.max(4, Math.pow(2, Math.ceil(Math.log2(count))));
+  const totalRounds = Math.max(2, Math.log2(nextPow2));
   const numByes = nextPow2 - count;
 
-  // Pad with nulls (BYEs) at the start so top seeds get them
-  const padded: (Player | null)[] = [];
-  for (let i = 0; i < numByes; i++) padded.push(null);
-  padded.push(...players);
-
-  // Split: left half and right half
-  const half = nextPow2 / 2;
-  const leftSlots = padded.slice(0, half);
-  const rightSlots = padded.slice(half);
+  const M = nextPow2 / 2; // Total matches in Round 1
+  const halfM = M / 2;
 
   const matches: Array<{
     matchNumber: number;
@@ -51,11 +44,12 @@ function buildRound1Bracket(players: Player[]) {
 
   let mNum = 1;
 
-  // Left-side matches
-  for (let i = 0; i < leftSlots.length; i += 2) {
-    const p1 = leftSlots[i];
-    const p2 = leftSlots[i + 1];
+  // Generate Left matches (1 to halfM)
+  for (let i = 0; i < halfM; i++) {
+    const p1 = players[i] || null;
+    const p2 = players[M + i] || null;
     const isBye = !p1 || !p2;
+
     matches.push({
       matchNumber: mNum++,
       side: "L",
@@ -66,11 +60,12 @@ function buildRound1Bracket(players: Player[]) {
     });
   }
 
-  // Right-side matches
-  for (let i = 0; i < rightSlots.length; i += 2) {
-    const p1 = rightSlots[i];
-    const p2 = rightSlots[i + 1];
+  // Generate Right matches (1 to halfM)
+  for (let i = 0; i < halfM; i++) {
+    const p1 = players[halfM + i] || null;
+    const p2 = players[M + halfM + i] || null;
     const isBye = !p1 || !p2;
+
     matches.push({
       matchNumber: mNum++,
       side: "R",
