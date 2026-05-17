@@ -282,16 +282,16 @@ function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, 
     while (diff > Math.PI) diff -= Math.PI * 2;
     g.rotation.y += diff * 0.18;
 
-    if (isHit) {
-      g.position.y = Math.sin(timeRef.current * 38) * 0.18 * recoilRef.current;
-      g.rotation.z = Math.sin(timeRef.current * 32) * 0.14 * recoilRef.current;
-    } else if (isAttacking) {
-      g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.2); // Keep grounded during advanced attacks
-      g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.15);
-    } else {
-      g.position.y = Math.sin(timeRef.current * 2.2) * 0.04;
-      g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.1);
-    }
+     if (isHit) {
+       g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.2);
+       g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.15);
+     } else if (isAttacking) {
+       g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.2); // Keep grounded during advanced attacks
+       g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.15);
+     } else {
+       g.position.y = Math.sin(timeRef.current * 2.2) * 0.04;
+       g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.1);
+     }
     if (lungeDirRef?.current.active && isAttacking) {
       g.position.x = THREE.MathUtils.lerp(g.position.x, posRef.current.x + lungeDirRef.current.x * 0.7, 0.35);
       g.position.z = THREE.MathUtils.lerp(g.position.z, posRef.current.z + lungeDirRef.current.z * 0.7, 0.35);
@@ -1020,7 +1020,7 @@ export default function Battle() {
 
   return (
     <div
-      className={`w-screen h-screen bg-black overflow-hidden relative ${screenShake ? "animate-shake" : ""}`}
+      className="w-screen h-screen bg-black overflow-hidden relative"
       tabIndex={0}
       style={{ outline: "none" }}
     >

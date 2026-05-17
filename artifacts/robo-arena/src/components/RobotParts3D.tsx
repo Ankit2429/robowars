@@ -1319,12 +1319,12 @@ export function HighFidelityRobotMesh({
         if (ref) ref.rotation.y += rollDelta;
       });
     }
-    // ── Hit shudder + emissive
+    // ── Hit emissive
     if (isHit) {
       emissiveRef.current = 5.0;
       if (groupRef.current) {
-        groupRef.current.position.x = (Math.random() - 0.5) * 0.15;
-        groupRef.current.position.z = (Math.random() - 0.5) * 0.15;
+        groupRef.current.position.x = 0;
+        groupRef.current.position.z = 0;
       }
     } else {
       if (groupRef.current) {
