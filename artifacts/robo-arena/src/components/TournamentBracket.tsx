@@ -248,18 +248,29 @@ export function TournamentBracket({ registeredPlayers }: Props) {
   useEffect(() => {
     const updateScale = () => {
       if (!bracketWrapRef.current || !bracketInnerRef.current) return;
-      const available = bracketWrapRef.current.clientWidth - 32; // 16px padding each side
+      
+      // Calculate absolute real available space in viewport
+      const parentMax = Math.min(window.innerWidth, 1280);
+      // Subtract sidebar width (280px), gap (32px), main page paddings (64px), card paddings (64px)
+      const available = Math.max(300, parentMax - 450); 
+      
       const natural = bracketInnerRef.current.scrollWidth;
       if (natural > available) {
-        setBracketScale(Math.max(0.3, available / natural));
+        setBracketScale(Math.max(0.28, available / natural));
       } else {
         setBracketScale(1);
       }
     };
     updateScale();
+    
+    window.addEventListener("resize", updateScale);
     const ro = new ResizeObserver(updateScale);
     if (bracketWrapRef.current) ro.observe(bracketWrapRef.current);
-    return () => ro.disconnect();
+    
+    return () => {
+      window.removeEventListener("resize", updateScale);
+      ro.disconnect();
+    };
   }, [state.matches]);
 
   const handleStart = async () => {
