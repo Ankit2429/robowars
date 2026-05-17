@@ -294,7 +294,19 @@ export function TournamentBracket({ registeredPlayers }: Props) {
     if (registeredPlayers.length < 2) { flash("❌ Need at least 2 registered players"); return; }
     setLoading(true);
     try {
-      const players = registeredPlayers.map(p => ({ pilotName: p.name, robotName: "RoboWars Bot" }));
+      // Deduplicate case-insensitively by USN
+      const uniquePlayersMap = new Map<string, typeof registeredPlayers[0]>();
+      registeredPlayers.forEach(p => {
+        const key = p.usn.toLowerCase().trim();
+        if (!uniquePlayersMap.has(key)) {
+          uniquePlayersMap.set(key, p);
+        }
+      });
+      const uniquePlayers = Array.from(uniquePlayersMap.values());
+
+      if (uniquePlayers.length < 2) { flash("❌ Need at least 2 unique registered players"); return; }
+
+      const players = uniquePlayers.map(p => ({ pilotName: p.usn, robotName: "RoboWars Bot" }));
       const res = await customFetch<any>("/api/tournament/start", { method: "POST", body: JSON.stringify({ players }) });
       flash(`✅ Tournament started! ${res.numByes} BYE(s), ${res.totalRounds} rounds.`);
       loadTournament();

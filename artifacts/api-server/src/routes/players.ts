@@ -24,7 +24,8 @@ router.post("/players/register", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, usn, branch, code } = parsed.data;
+  const { name, usn: rawUsn, branch, code } = parsed.data;
+  const usn = rawUsn.toLowerCase().trim();
   req.log.info({ name, usn, branch, code }, "Parsed registration data");
 
   // Step 2: Validate access code (hardcoded)

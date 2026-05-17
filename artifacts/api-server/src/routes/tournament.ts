@@ -21,214 +21,115 @@ const router = Router();
 
 type Player = { id: number; pilotName: string; robotName: string };
 
-// ── Helper: build round-1 bracket with sides (L/R) and BYEs ──────────────────
-function buildRound1Bracket(players: Player[]) {
-  const count = players.length;
-  if (count < 2) return null;
+// ── Helper: propagate match winner to next round match slot ───────────────────
+export async function propagateWinnerToNextRound(match: typeof tournamentMatchesTable.$inferSelect) {
+  if (match.status !== "finished" || !match.winnerId) return;
 
-  const nextPow2 = Math.max(4, Math.pow(2, Math.ceil(Math.log2(count))));
-  const totalRounds = Math.max(2, Math.log2(nextPow2));
-  const numByes = nextPow2 - count;
+  const tournamentId = match.tournamentId;
+  const nextRoundNumber = match.roundNumber + 1;
 
-  const M = nextPow2 / 2; // Total matches in Round 1
-  const halfM = M / 2;
+  const [tournament] = await db.select().from(tournamentsTable).where(eq(tournamentsTable.id, tournamentId));
+  if (!tournament) return;
 
-  const matches: Array<{
-    matchNumber: number;
-    side: string;
-    player1: Player | null;
-    player2: Player | null;
-    isBye: boolean;
-    byeWinner: Player | null;
-  }> = [];
-
-  let mNum = 1;
-
-  // Generate Left matches (1 to halfM)
-  for (let i = 0; i < halfM; i++) {
-    const p1 = players[i] || null;
-    const p2 = players[M + i] || null;
-    const isBye = !p1 || !p2;
-
-    matches.push({
-      matchNumber: mNum++,
-      side: "L",
-      player1: p1,
-      player2: p2,
-      isBye,
-      byeWinner: isBye ? (p1 || p2) : null,
-    });
-  }
-
-  // Generate Right matches (1 to halfM)
-  for (let i = 0; i < halfM; i++) {
-    const p1 = players[halfM + i] || null;
-    const p2 = players[M + halfM + i] || null;
-    const isBye = !p1 || !p2;
-
-    matches.push({
-      matchNumber: mNum++,
-      side: "R",
-      player1: p1,
-      player2: p2,
-      isBye,
-      byeWinner: isBye ? (p1 || p2) : null,
-    });
-  }
-
-  return { matches, totalRounds, numByes };
-}
-
-// ── Helper: build next-round matches preserving sides ─────────────────────────
-function buildNextRoundMatches(
-  winners: Array<{ player: Player; side: string }>
-) {
-  const leftWinners = winners.filter(w => w.side === "L").map(w => w.player);
-  const rightWinners = winners.filter(w => w.side === "R").map(w => w.player);
-
-  const matches: Array<{
-    matchNumber: number;
-    side: string;
-    player1: Player | null;
-    player2: Player | null;
-    isBye: boolean;
-    byeWinner: Player | null;
-  }> = [];
-
-  let mNum = 1;
-
-  if (leftWinners.length === 1 && rightWinners.length === 1) {
-    // Grand Final
-    matches.push({
-      matchNumber: mNum++,
-      side: "F",
-      player1: leftWinners[0],
-      player2: rightWinners[0],
-      isBye: false,
-      byeWinner: null,
-    });
-  } else {
-    // Pair up left winners
-    for (let i = 0; i < leftWinners.length; i += 2) {
-      const p1 = leftWinners[i];
-      const p2 = leftWinners[i + 1] || null;
-      const isBye = !p2;
-      matches.push({ matchNumber: mNum++, side: "L", player1: p1, player2: p2, isBye, byeWinner: isBye ? p1 : null });
+  if (nextRoundNumber > tournament.totalRounds) {
+    // Grand Final finished! Crown the Champion!
+    await db.update(tournamentsTable).set({ status: "finished", winnerId: match.winnerId }).where(eq(tournamentsTable.id, tournamentId));
+    await db.update(tournamentPlayersTable).set({ status: "winner" }).where(eq(tournamentPlayersTable.id, match.winnerId));
+    
+    try {
+      const [champ] = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.id, match.winnerId));
+      if (champ) {
+        const [lb] = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, champ.pilotName));
+        const wins = (lb?.wins ?? 0) + 1;
+        const points = (lb?.points ?? 1000) + 1500;
+        const credits = (lb?.credits ?? 0) + 500;
+        const totalBattles = (lb?.totalBattles ?? 0) + 1;
+        
+        if (lb) {
+          await db.update(leaderboardTable).set({
+            wins, points, credits, totalBattles, winRate: wins / totalBattles, updatedAt: new Date()
+          }).where(eq(leaderboardTable.playerName, champ.pilotName));
+        } else {
+          await db.insert(leaderboardTable).values({
+            playerName: champ.pilotName, wins: 1, losses: 0, totalBattles: 1, winRate: 1.0, points, credits
+          });
+        }
+        logger.info({ pilotName: champ.pilotName }, "Permanent leaderboard stats updated for tournament champion");
+      }
+    } catch (err: any) {
+      logger.error({ err: err.message }, "Failed to update permanent leaderboard for champion");
     }
-    // Pair up right winners
-    for (let i = 0; i < rightWinners.length; i += 2) {
-      const p1 = rightWinners[i];
-      const p2 = rightWinners[i + 1] || null;
-      const isBye = !p2;
-      matches.push({ matchNumber: mNum++, side: "R", player1: p1, player2: p2, isBye, byeWinner: isBye ? p1 : null });
+    return;
+  }
+
+  let childSide = match.side;
+  let childMatchNumber = Math.ceil(match.matchNumber / 2);
+  let isPlayer1 = match.matchNumber % 2 !== 0;
+
+  if (nextRoundNumber === tournament.totalRounds) {
+    // Next round is the Grand Final (Side "F", Match 1)
+    childSide = "F";
+    childMatchNumber = 1;
+    isPlayer1 = match.side === "L";
+  }
+
+  const [childMatch] = await db.select().from(tournamentMatchesTable)
+    .where(and(
+      eq(tournamentMatchesTable.tournamentId, tournamentId),
+      eq(tournamentMatchesTable.roundNumber, nextRoundNumber),
+      eq(tournamentMatchesTable.side, childSide),
+      eq(tournamentMatchesTable.matchNumber, childMatchNumber)
+    ));
+
+  if (childMatch) {
+    const [winnerPlayer] = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.id, match.winnerId));
+    if (winnerPlayer) {
+      const updateData: any = {};
+      if (isPlayer1) {
+        updateData.player1Id = winnerPlayer.id;
+        updateData.player1Name = winnerPlayer.pilotName;
+        updateData.player1RobotName = winnerPlayer.robotName;
+      } else {
+        updateData.player2Id = winnerPlayer.id;
+        updateData.player2Name = winnerPlayer.pilotName;
+        updateData.player2RobotName = winnerPlayer.robotName;
+      }
+      
+      await db.update(tournamentMatchesTable).set(updateData).where(eq(tournamentMatchesTable.id, childMatch.id));
+      logger.info({ childMatchId: childMatch.id, winnerId: winnerPlayer.id }, "Propagated winner to next round match");
     }
   }
-
-  return matches;
 }
 
-// ── Helper: auto-advance after a match is finished ────────────────────────────
+// ── Helper: auto-advance active round if all current matches are finished ─────
 export async function tryAutoAdvance(tournamentId: number) {
   const [tournament] = await db.select().from(tournamentsTable).where(eq(tournamentsTable.id, tournamentId));
   if (!tournament || tournament.status !== "active") return;
 
   const currentRound = tournament.currentRound;
   const roundMatches = await db.select().from(tournamentMatchesTable)
-    .where(and(eq(tournamentMatchesTable.tournamentId, tournamentId), eq(tournamentMatchesTable.roundNumber, currentRound)))
-    .orderBy(tournamentMatchesTable.matchNumber);
+    .where(and(eq(tournamentMatchesTable.tournamentId, tournamentId), eq(tournamentMatchesTable.roundNumber, currentRound)));
 
   const allDone = roundMatches.every((m: typeof roundMatches[0]) => m.status === "finished");
   if (!allDone) return;
 
-  // Gather winners with their sides
-  const winnersList: Array<{ player: Player; side: string }> = [];
-  for (const m of roundMatches) {
-    if (m.winnerId && m.winnerName) {
-      const [p] = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.id, m.winnerId));
-      if (p) winnersList.push({ player: { id: p.id, pilotName: p.pilotName, robotName: p.robotName }, side: m.side ?? "L" });
-    }
-  }
-
-  if (winnersList.length <= 1) {
-    // Champion!
-    const champ = winnersList[0]?.player;
-    await db.update(tournamentsTable).set({ status: "finished", winnerId: champ?.id ?? null }).where(eq(tournamentsTable.id, tournamentId));
-    if (champ) {
-      await db.update(tournamentPlayersTable).set({ status: "winner" }).where(eq(tournamentPlayersTable.id, champ.id));
-      
-      // Permanently update Pilot ID leaderboard stats
-      try {
-        const [lb] = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, champ.pilotName));
-        const wins = (lb?.wins ?? 0) + 1;
-        const points = (lb?.points ?? 1000) + 1500; // Grand Tournament Champion points reward!
-        const credits = (lb?.credits ?? 0) + 500; // credits reward
-        const totalBattles = (lb?.totalBattles ?? 0) + 1;
-        
-        if (lb) {
-          await db.update(leaderboardTable).set({
-            wins,
-            points,
-            credits,
-            totalBattles,
-            winRate: wins / totalBattles,
-            updatedAt: new Date()
-          }).where(eq(leaderboardTable.playerName, champ.pilotName));
-        } else {
-          await db.insert(leaderboardTable).values({
-            playerName: champ.pilotName,
-            wins: 1,
-            losses: 0,
-            totalBattles: 1,
-            winRate: 1.0,
-            points,
-            credits
-          });
-        }
-        logger.info({ pilotName: champ.pilotName, points, credits }, "Tournament Champion crowned and saved permanently to leaderboardTable!");
-      } catch (err: any) {
-        logger.error({ err: err.message, pilotName: champ.pilotName }, "Failed to update leaderboard stats for tournament champion");
-      }
-    }
-    globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, tournamentId);
+  if (currentRound === tournament.totalRounds) {
     return;
   }
 
-  // Generate next round
   const nextRound = currentRound + 1;
   await db.update(tournamentsTable).set({ currentRound: nextRound }).where(eq(tournamentsTable.id, tournamentId));
+  
   await db.update(tournamentRoundsTable).set({ status: "finished" })
     .where(and(eq(tournamentRoundsTable.tournamentId, tournamentId), eq(tournamentRoundsTable.roundNumber, currentRound)));
 
-  const [newRound] = await db.insert(tournamentRoundsTable).values({
-    tournamentId, roundNumber: nextRound, status: "active",
-  }).returning();
+  await db.update(tournamentRoundsTable).set({ status: "active" })
+    .where(and(eq(tournamentRoundsTable.tournamentId, tournamentId), eq(tournamentRoundsTable.roundNumber, nextRound)));
 
-  const nextMatches = buildNextRoundMatches(winnersList);
-
-  await db.insert(tournamentMatchesTable).values(
-    nextMatches.map(m => ({
-      tournamentId,
-      roundId: newRound.id,
-      roundNumber: nextRound,
-      matchNumber: m.matchNumber,
-      side: m.side,
-      player1Id: m.player1?.id ?? null,
-      player2Id: m.player2?.id ?? null,
-      player1Name: m.player1?.pilotName ?? null,
-      player2Name: m.player2?.pilotName ?? null,
-      player1RobotName: m.player1?.robotName ?? null,
-      player2RobotName: m.player2?.robotName ?? null,
-      isBye: m.isBye,
-      battleRoomId: m.isBye ? null : `tourney_${tournamentId}_r${nextRound}_m${m.matchNumber}_${Math.random().toString(36).slice(2, 7)}`,
-      status: m.isBye ? ("finished" as const) : ("pending" as const),
-      winnerId: m.byeWinner?.id ?? null,
-      winnerName: m.byeWinner?.pilotName ?? null,
-    }))
-  );
-
+  logger.info({ tournamentId, nextRound }, "Advanced tournament round");
   globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, tournamentId);
 
-  // If new round also has all BYEs, keep advancing
+  // Recursively auto-advance in case next round is already completed
   await tryAutoAdvance(tournamentId);
 }
 
@@ -274,38 +175,172 @@ router.post("/tournament/start", async (req, res) => {
       players.map((p, i) => ({ tournamentId: tournament.id, pilotName: p.pilotName, robotName: p.robotName, seed: i + 1, status: "active" as const }))
     ).returning();
 
-    const bracket = buildRound1Bracket(insertedPlayers);
-    if (!bracket) { res.status(500).json({ error: "Failed to build bracket" }); return; }
+    const M = nextPow2 / 2; // Total matches in Round 1
+    const halfM = M / 2;
 
-    const [round1] = await db.insert(tournamentRoundsTable).values({ tournamentId: tournament.id, roundNumber: 1, status: "active" }).returning();
+    const r1Matches: Array<{
+      matchNumber: number;
+      side: string;
+      player1: Player | null;
+      player2: Player | null;
+      isBye: boolean;
+      byeWinner: Player | null;
+    }> = [];
 
-    await db.insert(tournamentMatchesTable).values(
-      bracket.matches.map(m => ({
+    let mNum = 1;
+    // Generate Left matches (1 to halfM)
+    for (let i = 0; i < halfM; i++) {
+      const p1 = insertedPlayers[i] || null;
+      const p2 = insertedPlayers[M + i] || null;
+      const isBye = !p1 || !p2;
+      r1Matches.push({
+        matchNumber: mNum++,
+        side: "L",
+        player1: p1 ? { id: p1.id, pilotName: p1.pilotName, robotName: p1.robotName } : null,
+        player2: p2 ? { id: p2.id, pilotName: p2.pilotName, robotName: p2.robotName } : null,
+        isBye,
+        byeWinner: isBye ? (p1 ? { id: p1.id, pilotName: p1.pilotName, robotName: p1.robotName } : (p2 ? { id: p2.id, pilotName: p2.pilotName, robotName: p2.robotName } : null)) : null,
+      });
+    }
+
+    // Generate Right matches (halfM+1 to M)
+    for (let i = 0; i < halfM; i++) {
+      const p1 = insertedPlayers[halfM + i] || null;
+      const p2 = insertedPlayers[M + halfM + i] || null;
+      const isBye = !p1 || !p2;
+      r1Matches.push({
+        matchNumber: mNum++,
+        side: "R",
+        player1: p1 ? { id: p1.id, pilotName: p1.pilotName, robotName: p1.robotName } : null,
+        player2: p2 ? { id: p2.id, pilotName: p2.pilotName, robotName: p2.robotName } : null,
+        isBye,
+        byeWinner: isBye ? (p1 ? { id: p1.id, pilotName: p1.pilotName, robotName: p1.robotName } : (p2 ? { id: p2.id, pilotName: p2.pilotName, robotName: p2.robotName } : null)) : null,
+      });
+    }
+
+    // Create tournament rounds in database
+    const roundsToInsert = [];
+    for (let r = 1; r <= totalRounds; r++) {
+      roundsToInsert.push({
         tournamentId: tournament.id,
-        roundId: round1.id,
-        roundNumber: 1,
-        matchNumber: m.matchNumber,
-        side: m.side,
-        player1Id: m.player1?.id ?? null,
-        player2Id: m.player2?.id ?? null,
-        player1Name: m.player1?.pilotName ?? null,
-        player2Name: m.player2?.pilotName ?? null,
-        player1RobotName: m.player1?.robotName ?? null,
-        player2RobotName: m.player2?.robotName ?? null,
-        isBye: m.isBye,
-        battleRoomId: m.isBye ? null : `tourney_${tournament.id}_r1_m${m.matchNumber}_${Math.random().toString(36).slice(2, 7)}`,
-        status: m.isBye ? ("finished" as const) : ("pending" as const),
-        winnerId: m.byeWinner?.id ?? null,
-        winnerName: m.byeWinner?.pilotName ?? null,
-      }))
-    );
+        roundNumber: r,
+        status: r === 1 ? "active" : "pending",
+      });
+    }
+    const insertedRounds = await db.insert(tournamentRoundsTable).values(roundsToInsert).returning();
+    const roundIdMap = new Map<number, number>();
+    insertedRounds.forEach((r: any) => roundIdMap.set(r.roundNumber, r.id));
+
+    const matchesToInsert: any[] = [];
+
+    // Round 1 matches insertion details
+    const insertedR1Matches = r1Matches.map(m => ({
+      tournamentId: tournament.id,
+      roundId: roundIdMap.get(1)!,
+      roundNumber: 1,
+      matchNumber: m.matchNumber,
+      side: m.side,
+      player1Id: m.player1?.id ?? null,
+      player2Id: m.player2?.id ?? null,
+      player1Name: m.player1?.pilotName ?? null,
+      player2Name: m.player2?.pilotName ?? null,
+      player1RobotName: m.player1?.robotName ?? null,
+      player2RobotName: m.player2?.robotName ?? null,
+      isBye: m.isBye,
+      battleRoomId: m.isBye ? null : `tourney_${tournament.id}_r1_m${m.matchNumber}_${Math.random().toString(36).slice(2, 7)}`,
+      status: m.isBye ? ("finished" as const) : ("pending" as const),
+      winnerId: m.byeWinner?.id ?? null,
+      winnerName: m.byeWinner?.pilotName ?? null,
+    }));
+
+    matchesToInsert.push(...insertedR1Matches);
+
+    // Generating empty matches for Rounds 2 to totalRounds - 1
+    for (let r = 2; r < totalRounds; r++) {
+      const roundId = roundIdMap.get(r)!;
+      const matchCount = halfM / Math.pow(2, r - 1);
+      
+      // Left matches
+      for (let m = 1; m <= matchCount; m++) {
+        matchesToInsert.push({
+          tournamentId: tournament.id,
+          roundId,
+          roundNumber: r,
+          matchNumber: m,
+          side: "L",
+          player1Id: null,
+          player2Id: null,
+          player1Name: null,
+          player2Name: null,
+          player1RobotName: null,
+          player2RobotName: null,
+          isBye: false,
+          battleRoomId: `tourney_${tournament.id}_r${r}_mL${m}_${Math.random().toString(36).slice(2, 7)}`,
+          status: "pending",
+          winnerId: null,
+          winnerName: null,
+        });
+      }
+      
+      // Right matches
+      for (let m = 1; m <= matchCount; m++) {
+        matchesToInsert.push({
+          tournamentId: tournament.id,
+          roundId,
+          roundNumber: r,
+          matchNumber: m,
+          side: "R",
+          player1Id: null,
+          player2Id: null,
+          player1Name: null,
+          player2Name: null,
+          player1RobotName: null,
+          player2RobotName: null,
+          isBye: false,
+          battleRoomId: `tourney_${tournament.id}_r${r}_mR${m}_${Math.random().toString(36).slice(2, 7)}`,
+          status: "pending",
+          winnerId: null,
+          winnerName: null,
+        });
+      }
+    }
+
+    // Grand Final Match (Round totalRounds)
+    const finalRoundId = roundIdMap.get(totalRounds)!;
+    matchesToInsert.push({
+      tournamentId: tournament.id,
+      roundId: finalRoundId,
+      roundNumber: totalRounds,
+      matchNumber: 1,
+      side: "F",
+      player1Id: null,
+      player2Id: null,
+      player1Name: null,
+      player2Name: null,
+      player1RobotName: null,
+      player2RobotName: null,
+      isBye: false,
+      battleRoomId: `tourney_${tournament.id}_r${totalRounds}_mF1_${Math.random().toString(36).slice(2, 7)}`,
+      status: "pending",
+      winnerId: null,
+      winnerName: null,
+    });
+
+    const insertedMatches = await db.insert(tournamentMatchesTable).values(matchesToInsert).returning();
+
+    // Propagate Round 1 BYE winners to Round 2 immediately
+    for (const match of insertedMatches) {
+      if (match.status === "finished" && match.isBye) {
+        await propagateWinnerToNextRound(match);
+      }
+    }
 
     globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, tournament.id);
 
-    // Auto-advance if round 1 is all BYEs
+    // Auto-advance if active round finished (runs async)
     await tryAutoAdvance(tournament.id);
 
-    res.json({ success: true, tournament, totalRounds, numByes: bracket.numByes });
+    res.json({ success: true, tournament, totalRounds, numByes: nextPow2 - count });
   } catch (err: any) {
     req.log.error({ err: err.message }, "Failed to start tournament");
     res.status(500).json({ error: "Failed to start tournament", detail: err.message });
@@ -322,14 +357,12 @@ router.post("/tournament/declare-winner", async (req, res) => {
 
     await db.update(tournamentMatchesTable).set({ winnerId, winnerName, status: "finished" }).where(eq(tournamentMatchesTable.id, matchId));
 
-    // Mark loser as eliminated in both tournament table AND the main players table (Pilot ID record)
+    // Mark loser as eliminated in both tournament table AND the main players table
     const loserId = match.player1Id === winnerId ? match.player2Id : match.player1Id;
     if (loserId) {
       await db.update(tournamentPlayersTable).set({ status: "eliminated" }).where(eq(tournamentPlayersTable.id, loserId));
-      // Find the loser's pilot name and mark their main player record as Eliminated
       const [loserTournPlayer] = await db.select().from(tournamentPlayersTable).where(eq(tournamentPlayersTable.id, loserId));
       if (loserTournPlayer?.pilotName) {
-        // pilotName matches the 'usn' (Pilot ID) stored in playersTable
         await db
           .update(playersTable)
           .set({ status: "Eliminated" })
@@ -338,6 +371,10 @@ router.post("/tournament/declare-winner", async (req, res) => {
         logger.info({ pilotName: loserTournPlayer.pilotName }, "Pilot eliminated — main player record flagged");
       }
     }
+
+    // Propagate winner to next round match!
+    const [updatedMatch] = await db.select().from(tournamentMatchesTable).where(eq(tournamentMatchesTable.id, matchId));
+    await propagateWinnerToNextRound(updatedMatch);
 
     globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, match.tournamentId);
     res.json({ success: true });

@@ -3,13 +3,14 @@ import { Server as HttpServer } from "http";
 import { db } from "@workspace/db";
 import { 
   roomsTable, leaderboardTable, 
-  tournamentMatchesTable, tournamentPlayersTable 
+  tournamentMatchesTable, tournamentPlayersTable,
+  playersTable
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
 import { logger } from "./lib/logger";
 import { globalEvents, EVENTS } from "./lib/events";
-import { tryAutoAdvance } from "./routes/tournament";
+import { tryAutoAdvance, propagateWinnerToNextRound } from "./routes/tournament";
 
 interface Player {
   socketId: string;
@@ -455,6 +456,10 @@ async function endBattle(io: SocketIOServer, roomId: string, winnerName: string,
             if (loserPlayer) {
               await db.update(tournamentPlayersTable).set({ status: "eliminated" }).where(eq(tournamentPlayersTable.id, loserPlayer.id));
             }
+
+            // Propagate winner to next round match slot!
+            const [updatedMatch] = await db.select().from(tournamentMatchesTable).where(eq(tournamentMatchesTable.id, match.id));
+            await propagateWinnerToNextRound(updatedMatch);
 
             globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, match.tournamentId);
             // The auto-advance logic is automatically triggered
