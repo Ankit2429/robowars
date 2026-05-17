@@ -18,6 +18,31 @@ const RAGE_LINES = [
   "GAME OVER. INSERT SKILL CARD"
 ];
 
+// High-fidelity letter-by-letter typewriter text crawling
+function TypewriterText({ text }: { text: string }) {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayed(text.slice(0, i + 1));
+      i++;
+      if (i >= text.length) clearInterval(interval);
+    }, 40);
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return (
+    <span className="font-mono text-[#ff3333] font-black uppercase tracking-wider text-xl leading-relaxed">
+      {displayed}
+      <motion.span
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ repeat: Infinity, duration: 0.6 }}
+        className="inline-block w-2.5 h-5 bg-[#ff3333] ml-1 align-middle"
+      />
+    </span>
+  );
+}
+
 export function RageQuitModal({ playerName, onLogout }: RageQuitModalProps) {
   const { logout } = useSession();
   const [lineIdx] = useState(() => Math.floor(Math.random() * RAGE_LINES.length));
@@ -38,6 +63,7 @@ export function RageQuitModal({ playerName, onLogout }: RageQuitModalProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md overflow-hidden"
       >
         {/* Red scan line sweep */}
@@ -65,6 +91,7 @@ export function RageQuitModal({ playerName, onLogout }: RageQuitModalProps) {
         <motion.div
           initial={{ scale: 0.7, y: 60 }}
           animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.7, y: 60 }}
           transition={{ type: "spring", stiffness: 220, damping: 18 }}
           className="relative w-full max-w-lg mx-4 text-center"
         >
@@ -92,27 +119,35 @@ export function RageQuitModal({ playerName, onLogout }: RageQuitModalProps) {
             UNIT PERMANENTLY DESTROYED
           </div>
 
-          {/* Pilot ID */}
-          <div className="border border-[#ff2222]/40 bg-[#ff0000]/5 p-3 mb-4">
+          {/* Pilot ID Box */}
+          <div className="border border-[#ff2222]/40 bg-[#ff0000]/5 p-3 mb-5">
             <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Pilot: </span>
             <span className="font-display font-bold text-white text-lg tracking-widest">{playerName}</span>
             <span className="font-mono text-xs text-[#ff4444] ml-3 uppercase">[ ELIMINATED ]</span>
           </div>
 
-          {/* Rage bait message */}
+          {/* ── HIGH FIDELITY POPUP DIAGNOSTIC CARD (SPRING ANIMATION) ── */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="border-l-4 border-[#ff2222] bg-[#ff0000]/8 p-4 mb-6 text-left"
+            initial={{ scale: 0.4, opacity: 0, rotate: -3 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: "spring", delay: 0.5, stiffness: 250, damping: 15 }}
+            className="border-2 border-[#ff2222] bg-[#330000]/40 backdrop-blur-md p-6 mb-6 rounded-sm shadow-[0_0_40px_rgba(255,34,34,0.35)] relative overflow-hidden"
           >
-            <p className="font-mono text-[#ff5555] text-sm leading-relaxed uppercase tracking-wide">
-              {RAGE_LINES[lineIdx]}
-            </p>
-            <p className="font-mono text-muted-foreground text-xs mt-2 leading-relaxed">
-              Your combat license has been permanently revoked. Your pilot ID will be archived
-              in the Hall of Shame. The only way out is to start over with a new callsign.
-            </p>
+            {/* Corner Bracket Details */}
+            <div className="absolute top-0 left-0 bg-[#ff2222] text-black font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 font-black">
+              ARENA DIAGNOSTIC
+            </div>
+            
+            <div className="py-4 text-center leading-relaxed">
+              <TypewriterText text={RAGE_LINES[lineIdx]} />
+            </div>
+
+            <div className="border-t border-[#ff2222]/30 pt-3 flex justify-between items-center text-[10px] font-mono text-[#ff6666]/70 uppercase tracking-widest">
+              <span>CALLSIGN: {playerName}</span>
+              <span className="animate-pulse flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> ERROR RECORDED
+              </span>
+            </div>
           </motion.div>
 
           {/* Stats line */}

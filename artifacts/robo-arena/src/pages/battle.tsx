@@ -1277,12 +1277,14 @@ export default function Battle() {
       </AnimatePresence>
 
       {/* ── Rage Quit Modal (loss) ── */}
-      {showRageQuit && (
-        <RageQuitModal
-          playerName={myRobot.playerName}
-          onLogout={handleRageQuitLogout}
-        />
-      )}
+      <AnimatePresence>
+        {showRageQuit && (
+          <RageQuitModal
+            playerName={myRobot.playerName}
+            onLogout={handleRageQuitLogout}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
