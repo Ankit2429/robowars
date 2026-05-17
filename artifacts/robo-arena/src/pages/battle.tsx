@@ -263,9 +263,25 @@ function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, 
     const g = groupRef.current;
     g.position.x = THREE.MathUtils.lerp(g.position.x, posRef.current.x, 0.28);
     g.position.z = THREE.MathUtils.lerp(g.position.z, posRef.current.z, 0.28);
-    const dx = targetPosRef.current.x - posRef.current.x;
-    const dz = targetPosRef.current.z - posRef.current.z;
-    g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, Math.atan2(dx, dz), 0.18);
+    
+    // Organic rotation: Face movement direction when moving, face opponent when stationary
+    const vx = velRef.current.x;
+    const vz = velRef.current.z;
+    const speed = Math.sqrt(vx * vx + vz * vz);
+    let targetAngle = g.rotation.y;
+    if (speed > 1.2) {
+      targetAngle = Math.atan2(vx, vz);
+    } else {
+      const dx = targetPosRef.current.x - posRef.current.x;
+      const dz = targetPosRef.current.z - posRef.current.z;
+      targetAngle = Math.atan2(dx, dz);
+    }
+    // Prevent 360-degree flip snapping using smooth wrapping interpolation
+    let diff = targetAngle - g.rotation.y;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    g.rotation.y += diff * 0.18;
+
     if (isHit) {
       g.position.y = Math.sin(timeRef.current * 38) * 0.18 * recoilRef.current;
       g.rotation.z = Math.sin(timeRef.current * 32) * 0.14 * recoilRef.current;
@@ -557,8 +573,8 @@ function KeybindsModal({ onClose }: { onClose: () => void }) {
     { keys: ["A", "←"], action: "Strafe Left" },
     { keys: ["D", "→"], action: "Strafe Right" },
     { keys: ["Space"], action: "Primary Attack" },
-    { keys: ["E"],     action: "Secondary Attack" },
-    { keys: ["Q"],     action: "Special Attack" },
+    { keys: ["Q"],     action: "Secondary Attack" },
+    { keys: ["E"],     action: "Special Attack" },
   ];
   return (
     <motion.div
