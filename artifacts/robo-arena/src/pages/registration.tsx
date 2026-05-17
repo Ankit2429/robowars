@@ -190,7 +190,7 @@ export default function Registration() {
                 type="text"
                 value={accessCode}
                 onChange={e => setAccessCode(e.target.value)}
-                placeholder="bot123"
+                placeholder="ENTER ACCESS CODE..."
                 className="w-full bg-background border-2 border-border focus:border-primary outline-none px-4 py-3 font-mono text-white text-lg uppercase tracking-widest placeholder:text-muted-foreground/40 transition-colors"
               />
             </div>
