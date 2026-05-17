@@ -207,6 +207,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
   const [myRobotName, setMyRobotName] = useState<string | null>(null);
   const [champion, setChampion] = useState<string | null>(null);
   const [bracketScale, setBracketScale] = useState(1);
+  const [bracketWidth, setBracketWidth] = useState<number | string>("max-content");
   const socketRef = useRef<Socket | null>(null);
   const bracketWrapRef = useRef<HTMLDivElement>(null);
   const bracketInnerRef = useRef<HTMLDivElement>(null);
@@ -254,11 +255,17 @@ export function TournamentBracket({ registeredPlayers }: Props) {
       // Subtract sidebar width (280px), gap (32px), main page paddings (64px), card paddings (64px)
       const available = Math.max(300, parentMax - 450); 
       
+      // Temporary revert width to max-content to get true natural scrollWidth
+      bracketInnerRef.current.style.width = "max-content";
       const natural = bracketInnerRef.current.scrollWidth;
+      
       if (natural > available) {
-        setBracketScale(Math.max(0.28, available / natural));
+        const scale = Math.max(0.28, available / natural);
+        setBracketScale(scale);
+        setBracketWidth(available / scale);
       } else {
         setBracketScale(1);
+        setBracketWidth("max-content");
       }
     };
     updateScale();
@@ -409,7 +416,7 @@ export function TournamentBracket({ registeredPlayers }: Props) {
               gap: COL_GAP,
               transformOrigin: "top center",
               transform: `scale(${bracketScale})`,
-              width: "max-content",
+              width: bracketWidth,
             }}
           >
 
