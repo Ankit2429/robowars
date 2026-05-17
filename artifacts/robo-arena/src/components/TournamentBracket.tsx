@@ -128,7 +128,7 @@ function MatchCard({
   );
 }
 
-// ── Bracket Column ───────────────────────────────────────────────────────────
+// ── BracketColumn ───────────────────────────────────────────────────────────
 function BracketColumn({
   round, matches, totalMatchesInRound1PerSide, currentRound, onWin, isFinal, reversed, myRobotName
 }: {
@@ -140,55 +140,60 @@ function BracketColumn({
   const colHeight = totalMatchesInRound1PerSide * BASE_UNIT;
 
   return (
-    <div className="relative flex-shrink-0" style={{ width: CARD_W, height: colHeight }}>
-      {Array.from({ length: Math.max(matchCount, 0) }).map((_, idx) => {
-        const match = matches[idx] || null;
-        const top = matchTop(round, idx);
-        const midY = top + CARD_H / 2;
-        const nextSlotH = slotHeight(round + 1);
-        const isTopOfPair = idx % 2 === 0;
-        const pairPartnerTop = isTopOfPair ? matchTop(round, idx + 1) + CARD_H / 2 : matchTop(round, idx - 1) + CARD_H / 2;
-        const connY1 = Math.min(midY, pairPartnerTop);
-        const connY2 = Math.max(midY, pairPartnerTop);
-        const connMidY = (connY1 + connY2) / 2;
-        const hasNext = round < (isFinal ? round : round + 1) && matchCount > 1;
+    <div className="relative flex-shrink-0">
+      <div className="absolute -top-10 left-0 right-0 text-center">
+        <span className={`font-mono text-[10px] uppercase tracking-widest ${round === currentRound ? "text-primary drop-shadow-[0_0_5px_rgba(255,69,0,0.8)]" : "text-white/30"}`}>
+          {round === 1 ? "Round 1" : `Round ${round}`}
+        </span>
+      </div>
+      <div className="relative" style={{ width: CARD_W, height: colHeight }}>
+        {Array.from({ length: Math.max(matchCount, 0) }).map((_, idx) => {
+          const match = matches[idx] || null;
+          const top = matchTop(round, idx);
+          const midY = top + CARD_H / 2;
+          const isTopOfPair = idx % 2 === 0;
+          const pairPartnerTop = isTopOfPair ? matchTop(round, idx + 1) + CARD_H / 2 : matchTop(round, idx - 1) + CARD_H / 2;
+          const connY1 = Math.min(midY, pairPartnerTop);
+          const connY2 = Math.max(midY, pairPartnerTop);
+          const connMidY = (connY1 + connY2) / 2;
 
-        return (
-          <div key={idx} className="absolute" style={{ top, left: 0 }}>
-            <MatchCard match={match} isCurrentRound={round === currentRound} onWin={onWin} isFinal={isFinal} myRobotName={myRobotName} />
+          return (
+            <div key={idx} className="absolute" style={{ top, left: 0 }}>
+              <MatchCard match={match} isCurrentRound={round === currentRound} onWin={onWin} isFinal={isFinal} myRobotName={myRobotName} />
 
-            {/* Horizontal connector OUT (right for left-side, left for right-side) */}
-            {!isFinal && matchCount > 1 && (
-              <motion.div
-                animate={match?.winnerId ? { opacity: [0.3, 0.8, 0.3] } : { opacity: 0.15 }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute top-1/2 -translate-y-1/2"
-                style={{
-                  [reversed ? "right" : "left"]: CARD_W,
-                  width: 24,
-                  height: 1,
-                  background: match?.winnerId ? "rgba(255,69,0,0.6)" : "rgba(255,255,255,0.15)",
-                }}
-              />
-            )}
+              {/* Horizontal connector OUT (right for left-side) */}
+              {!isFinal && matchCount > 1 && (
+                <motion.div
+                  animate={match?.winnerId ? { opacity: [0.5, 1, 0.5] } : { opacity: 0.15 }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute top-1/2 -translate-y-1/2"
+                  style={{
+                    [reversed ? "left" : "right"]: -48,
+                    width: 48,
+                    height: 2,
+                    background: match?.winnerId ? "rgba(255,69,0,0.6)" : "rgba(255,255,255,0.15)",
+                  }}
+                />
+              )}
 
-            {/* Vertical connector (only for top of pair) */}
-            {!isFinal && matchCount > 1 && isTopOfPair && idx + 1 < matchCount && (
-              <motion.div
-                animate={{ opacity: 0.15 }}
-                className="absolute"
-                style={{
-                  [reversed ? "right" : "left"]: CARD_W + 23,
-                  top: CARD_H / 2,
-                  width: 1,
-                  height: matchTop(round, idx + 1) + CARD_H / 2 - midY,
-                  background: "rgba(255,255,255,0.15)",
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+              {/* Vertical connector (only for top of pair) */}
+              {!isFinal && matchCount > 1 && isTopOfPair && idx + 1 < matchCount && (
+                <motion.div
+                  animate={{ opacity: 0.15 }}
+                  className="absolute"
+                  style={{
+                    [reversed ? "left" : "right"]: -48 + 24, // middle of the gap
+                    top: CARD_H / 2,
+                    width: 2,
+                    height: matchTop(round, idx + 1) + CARD_H / 2 - midY,
+                    background: "rgba(255,255,255,0.15)",
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -357,33 +362,35 @@ export function TournamentBracket({ registeredPlayers }: Props) {
 
       {/* Bracket View */}
       {tournament && matches.length > 0 && (
-        <div className="overflow-x-auto pb-6">
-          <div className="relative flex items-start gap-0 min-w-max" style={{ height: colHeight }}>
+        <div className="overflow-x-auto pb-12 pt-12 custom-scrollbar">
+          <div className="relative flex items-start justify-center min-w-max mx-auto" style={{ height: colHeight, gap: 48 }}>
 
             {/* LEFT SIDE: rounds progress left→right */}
-            {leftRounds.map((round, ri) => (
-              <BracketColumn
-                key={`L-${round}`}
-                round={round}
-                matches={getMatches("L", round)}
-                totalMatchesInRound1PerSide={r1PerSide}
-                currentRound={currentRound}
-                onWin={handleWin}
-                myRobotName={myRobotName}
-              />
-            ))}
+            <div className="flex gap-12">
+              {leftRounds.map((round) => (
+                <BracketColumn
+                  key={`L-${round}`}
+                  round={round}
+                  matches={getMatches("L", round)}
+                  totalMatchesInRound1PerSide={r1PerSide}
+                  currentRound={currentRound}
+                  onWin={handleWin}
+                  myRobotName={myRobotName}
+                />
+              ))}
+            </div>
 
             {/* CENTER: Final */}
             {finalRound && (
-              <div className="relative flex-shrink-0 flex flex-col items-center" style={{ width: CARD_W + 48, height: colHeight, marginLeft: 24, marginRight: 24 }}>
+              <div className="relative flex-shrink-0 flex flex-col items-center justify-center z-10" style={{ width: CARD_W + 64, height: colHeight }}>
                 {/* Trophy */}
-                <div className="absolute -top-8 left-0 right-0 text-center">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-yellow-400">Grand Final</span>
-                </div>
-                <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
-                  <motion.div animate={{ boxShadow: ["0 0 10px rgba(234,179,8,0.2)", "0 0 30px rgba(234,179,8,0.5)", "0 0 10px rgba(234,179,8,0.2)"] }} transition={{ duration: 2, repeat: Infinity }} className="w-12 h-12 rounded-full border border-yellow-500/40 bg-yellow-950/30 flex items-center justify-center mb-2">
-                    <Trophy className="w-6 h-6 text-yellow-400" />
+                <div className="absolute top-1/2 -translate-y-[120%] flex flex-col items-center gap-4">
+                  <span className="font-mono text-xs uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]">Grand Final</span>
+                  <motion.div animate={{ boxShadow: ["0 0 20px rgba(234,179,8,0.3)", "0 0 50px rgba(234,179,8,0.6)", "0 0 20px rgba(234,179,8,0.3)"] }} transition={{ duration: 2, repeat: Infinity }} className="w-16 h-16 rounded-full border border-yellow-500/60 bg-yellow-950/40 flex items-center justify-center mb-2">
+                    <Trophy className="w-8 h-8 text-yellow-400" />
                   </motion.div>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2">
                   <MatchCard
                     match={matches.find(m => m.side === "F" && m.roundNumber === finalRound) || null}
                     isCurrentRound={currentRound === finalRound}
@@ -392,45 +399,58 @@ export function TournamentBracket({ registeredPlayers }: Props) {
                     myRobotName={myRobotName}
                   />
                 </div>
+                
+                {/* Connectors from Left and Right to Center */}
+                {totalRounds > 1 && (
+                  <>
+                    <motion.div className="absolute top-1/2 -translate-y-1/2 left-0 -ml-12 w-12 h-0.5 bg-yellow-500/50" />
+                    <motion.div className="absolute top-1/2 -translate-y-1/2 right-0 -mr-12 w-12 h-0.5 bg-yellow-500/50" />
+                  </>
+                )}
               </div>
             )}
 
             {/* RIGHT SIDE: rounds progress right→left (innermost first) */}
-            {[...rightRounds].reverse().map((round, ri) => {
-              const rMatches = getMatches("R", round);
-              const matchCount = r1PerSide / Math.pow(2, round - 1);
-              return (
-                <div key={`R-${round}`} className="relative flex-shrink-0" style={{ marginLeft: ri === 0 ? 0 : 24 }}>
-                  <div className="absolute -top-8 left-0 right-0 text-center">
-                    <span className={`font-mono text-[9px] uppercase tracking-widest ${round === currentRound ? "text-primary" : "text-white/20"}`}>
-                      {round === 1 ? "Round 1" : round === totalRounds - 1 ? "Semifinals" : `Round ${round}`}
-                    </span>
+            <div className="flex gap-12">
+              {[...rightRounds].reverse().map((round) => {
+                const rMatches = getMatches("R", round);
+                const matchCount = r1PerSide / Math.pow(2, round - 1);
+                return (
+                  <div key={`R-${round}`} className="relative flex-shrink-0">
+                    <div className="absolute -top-10 left-0 right-0 text-center">
+                      <span className={`font-mono text-[10px] uppercase tracking-widest ${round === currentRound ? "text-primary drop-shadow-[0_0_5px_rgba(255,69,0,0.8)]" : "text-white/30"}`}>
+                        {round === 1 ? "Round 1" : round === totalRounds - 1 ? "Semifinals" : `Round ${round}`}
+                      </span>
+                    </div>
+                    <div className="relative" style={{ width: CARD_W, height: colHeight }}>
+                      {Array.from({ length: matchCount }).map((_, idx) => {
+                        const match = rMatches[idx] || null;
+                        const top = matchTop(round, idx);
+                        const midY = top + CARD_H / 2;
+                        const isTopOfPair = idx % 2 === 0;
+                        const pairPartnerMidY = isTopOfPair
+                          ? matchTop(round, idx + 1) + CARD_H / 2
+                          : matchTop(round, idx - 1) + CARD_H / 2;
+                        return (
+                          <div key={idx} className="absolute" style={{ top, left: 0 }}>
+                            <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} myRobotName={myRobotName} />
+                            {/* Horizontal stub left (connector IN from previous round) */}
+                            {round > 1 && (
+                              <div className="absolute top-1/2 -translate-y-1/2" style={{ right: CARD_W, width: 48, height: 2, background: match?.winnerId ? "rgba(255,69,0,0.6)" : "rgba(255,255,255,0.15)" }} />
+                            )}
+                            {/* Vertical connector for pairs */}
+                            {round > 1 && isTopOfPair && idx + 1 < matchCount && (
+                              <div className="absolute" style={{ right: CARD_W + 46, top: CARD_H / 2, width: 2, height: pairPartnerMidY - midY, background: "rgba(255,255,255,0.15)" }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="relative" style={{ width: CARD_W, height: colHeight }}>
-                    {Array.from({ length: matchCount }).map((_, idx) => {
-                      const match = rMatches[idx] || null;
-                      const top = matchTop(round, idx);
-                      const midY = top + CARD_H / 2;
-                      const isTopOfPair = idx % 2 === 0;
-                      const pairPartnerMidY = isTopOfPair
-                        ? matchTop(round, idx + 1) + CARD_H / 2
-                        : matchTop(round, idx - 1) + CARD_H / 2;
-                      return (
-                        <div key={idx} className="absolute" style={{ top, left: 0 }}>
-                          <MatchCard match={match} isCurrentRound={round === currentRound} onWin={handleWin} myRobotName={myRobotName} />
-                          {/* Horizontal stub left */}
-                          <div className="absolute top-1/2 -translate-y-1/2" style={{ right: CARD_W, width: 24, height: 1, background: match?.winnerId ? "rgba(255,69,0,0.5)" : "rgba(255,255,255,0.1)" }} />
-                          {/* Vertical connector */}
-                          {isTopOfPair && idx + 1 < matchCount && (
-                            <div className="absolute" style={{ right: CARD_W + 23, top: CARD_H / 2, width: 1, height: pairPartnerMidY - midY, background: "rgba(255,255,255,0.1)" }} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
           </div>
 
           {/* Round progress dots */}

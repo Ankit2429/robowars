@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, waitForDB } from "@workspace/db";
-import { playersTable } from "@workspace/db";
+import { playersTable, leaderboardTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -45,14 +45,20 @@ router.post("/players/register", async (req, res): Promise<void> => {
     return;
   }
 
-  // Step 4: Check for duplicate USN using Drizzle
+  // Step 4: Check for existing USN (Login Flow)
   try {
     req.log.info({ usn }, "Checking for existing USN...");
     const existing = await db.select().from(playersTable).where(eq(playersTable.usn, usn));
-    req.log.info({ existingCount: existing.length, usn }, "USN lookup result");
     if (existing.length > 0) {
-      req.log.warn({ usn }, "USN already registered — rejected");
-      res.status(409).json({ error: "USN already registered" });
+      req.log.info({ usn }, "USN found. Logging in pilot.");
+      // Fetch leaderboard data
+      const [lb] = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, usn));
+      const points = lb?.points ?? 1000;
+      const credits = lb?.credits ?? 0;
+      const wins = lb?.wins ?? 0;
+      const eliminated = existing[0].status === "Eliminated";
+      
+      res.status(200).json({ ...existing[0], points, credits, wins, eliminated });
       return;
     }
   } catch (err: any) {
@@ -61,7 +67,7 @@ router.post("/players/register", async (req, res): Promise<void> => {
     return;
   }
 
-  // Step 5: Insert new player using Drizzle
+  // Step 5: Insert new player (Registration Flow)
   try {
     req.log.info({ name, usn, branch, code }, "Inserting new player...");
     const [player] = await db.insert(playersTable).values({
@@ -72,8 +78,19 @@ router.post("/players/register", async (req, res): Promise<void> => {
       status: "Registered",
     }).returning();
 
+    // Initialize leaderboard entry with default points
+    await db.insert(leaderboardTable).values({
+      playerName: usn,
+      points: 1000,
+      credits: 0,
+      wins: 0,
+      losses: 0,
+      totalBattles: 0,
+      winRate: 0,
+    });
+
     req.log.info({ playerId: player.id, usn, name }, "Player registered successfully");
-    res.status(201).json(player);
+    res.status(201).json({ ...player, points: 1000, credits: 0, wins: 0, eliminated: false });
   } catch (err: any) {
     req.log.error({ err: err.message, stack: err.stack, name, usn }, "FAILED to insert player");
     res.status(500).json({ error: "Database error inserting player", detail: err.message });

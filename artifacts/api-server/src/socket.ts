@@ -9,6 +9,7 @@ import { eq, and } from "drizzle-orm";
 
 import { logger } from "./lib/logger";
 import { globalEvents, EVENTS } from "./lib/events";
+import { tryAutoAdvance } from "./routes/tournament";
 
 interface Player {
   socketId: string;
@@ -456,9 +457,8 @@ async function endBattle(io: SocketIOServer, roomId: string, winnerName: string,
             }
 
             globalEvents.emit(EVENTS.TOURNAMENT_UPDATED, match.tournamentId);
-            // The auto-advance logic is in the tournament route's listener or we can trigger it here
-            // Note: In our current tournament.ts, tryAutoAdvance is called from the endpoint. 
-            // We should ensure it's triggered.
+            // The auto-advance logic is automatically triggered
+            await tryAutoAdvance(match.tournamentId);
           }
         }
       }
@@ -475,13 +475,23 @@ async function endBattle(io: SocketIOServer, roomId: string, winnerName: string,
 
 async function upsertLeaderboard(playerName: string, won: boolean) {
   const existing = await db.select().from(leaderboardTable).where(eq(leaderboardTable.playerName, playerName));
+  const pointsReward = won ? 500 : 50; // PVP win reward
+  const creditsReward = won ? 50 : 10;
+  
   if (existing.length === 0) {
     const wins = won ? 1 : 0; const losses = won ? 0 : 1;
-    await db.insert(leaderboardTable).values({ playerName, wins, losses, totalBattles: 1, winRate: wins });
+    await db.insert(leaderboardTable).values({ 
+      playerName, wins, losses, totalBattles: 1, winRate: wins,
+      points: 1000 + pointsReward, credits: creditsReward
+    });
   } else {
     const e = existing[0];
     const wins = e.wins + (won ? 1 : 0); const losses = e.losses + (won ? 0 : 1);
     const totalBattles = e.totalBattles + 1;
-    await db.update(leaderboardTable).set({ wins, losses, totalBattles, winRate: wins / totalBattles }).where(eq(leaderboardTable.playerName, playerName));
+    const points = (e.points || 1000) + pointsReward;
+    const credits = (e.credits || 0) + creditsReward;
+    await db.update(leaderboardTable).set({ 
+      wins, losses, totalBattles, winRate: wins / totalBattles, points, credits 
+    }).where(eq(leaderboardTable.playerName, playerName));
   }
 }

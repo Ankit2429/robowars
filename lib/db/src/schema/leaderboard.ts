@@ -9,6 +9,8 @@ export const leaderboardTable = pgTable("leaderboard", {
   losses: integer("losses").notNull().default(0),
   totalBattles: integer("total_battles").notNull().default(0),
   winRate: real("win_rate").notNull().default(0),
+  points: integer("points").notNull().default(1000),
+  credits: integer("credits").notNull().default(0),
   favoriteRobot: text("favorite_robot"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

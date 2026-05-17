@@ -46,7 +46,7 @@ export default function Registration() {
 
     try {
       // Step 1: Register in backend DB
-      await customFetch<any>("/api/players/register", {
+      const resData = await customFetch<any>("/api/players/register", {
         method: "POST",
         body: JSON.stringify({ 
           name: trimmedName, 
@@ -57,7 +57,13 @@ export default function Registration() {
       });
 
       // Step 2: Login in local session context
-      login(trimmedUser, trimmedName);
+      const serverData = {
+        points: resData.points ?? 1000,
+        credits: resData.credits ?? 0,
+        wins: resData.wins ?? 0,
+        eliminated: resData.eliminated ?? false
+      };
+      login(trimmedUser, trimmedName, serverData);
       setLocation("/play");
     } catch (err: any) {
       console.error("[Registration] failed:", err);

@@ -270,7 +270,7 @@ function ArenaRobot({ posRef, targetPosRef, velRef, config, isAttacking, isHit, 
       g.position.y = Math.sin(timeRef.current * 38) * 0.18 * recoilRef.current;
       g.rotation.z = Math.sin(timeRef.current * 32) * 0.14 * recoilRef.current;
     } else if (isAttacking) {
-      g.position.y = Math.abs(Math.sin(timeRef.current * 20)) * 0.2;
+      g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.2); // Keep grounded during advanced attacks
       g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, 0, 0.15);
     } else {
       g.position.y = Math.sin(timeRef.current * 2.2) * 0.04;
@@ -480,8 +480,6 @@ function GameController({
         p2VelRef.current.z -= nz * escalation;
       }
 
-      wallBounce(p1PosRef.current, p1VelRef.current);
-      wallBounce(p2PosRef.current, p2VelRef.current);
 
       // Sparks on collision
       collisionCool.current = Math.max(0, collisionCool.current - dt);

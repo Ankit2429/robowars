@@ -6,6 +6,7 @@ export interface PlayerSession {
   username: string;
   playerName: string;
   points: number;
+  credits: number;
   wins: number;
   eliminated: boolean;
   createdAt: number;
@@ -28,6 +29,7 @@ export function createSession(username: string, playerName: string): PlayerSessi
     username: username.trim().toUpperCase(),
     playerName: playerName.trim(),
     points: STARTING_POINTS,
+    credits: 0,
     wins: 0,
     eliminated: false,
     createdAt: Date.now(),

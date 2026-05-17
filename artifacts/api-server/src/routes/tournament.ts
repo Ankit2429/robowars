@@ -132,7 +132,7 @@ function buildNextRoundMatches(
 }
 
 // ── Helper: auto-advance after a match is finished ────────────────────────────
-async function tryAutoAdvance(tournamentId: number) {
+export async function tryAutoAdvance(tournamentId: number) {
   const [tournament] = await db.select().from(tournamentsTable).where(eq(tournamentsTable.id, tournamentId));
   if (!tournament || tournament.status !== "active") return;
 

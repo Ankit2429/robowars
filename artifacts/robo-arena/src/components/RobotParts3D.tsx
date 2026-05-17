@@ -413,9 +413,9 @@ export function ShadowChassis({ intensity = 1, teamColor }: { intensity?: number
 // --- 2. PRIMARY WEAPONS (12)
 // ==========================================
 
-export function TitanDisc() {
+export function TitanDisc({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
   const spinRef = useRef<THREE.Group>(null!);
-  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * 12; });
+  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * (isAttacking ? 80 : 12); });
   return (
     // Mounted flush on front of chassis — y=0.65 puts disc centre at chassis top level
     <group position={[0, 0.65, 1.1]}>
@@ -468,9 +468,15 @@ export function TitanDisc() {
   );
 }
 
-export function Hammerhead() {
+export function Hammerhead({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const armRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (armRef.current) {
+      armRef.current.rotation.x = THREE.MathUtils.lerp(armRef.current.rotation.x, isAttacking ? 1.2 : 0, 0.2);
+    }
+  });
   return (
-    <group position={[0, 0.9, -0.3]}>
+    <group position={[0, 0.9, -0.3]} ref={armRef}>
       {/* Hydraulic tower arm */}
       <mesh position={[0, 0.9, 0.2]} castShadow receiveShadow rotation={[0.08, 0, 0]}><cylinderGeometry args={[0.12, 0.14, 1.8, 10]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
       {/* Piston pair */}
@@ -499,11 +505,11 @@ export function Hammerhead() {
   );
 }
 
-export function VerticalSpinner() {
+export function VerticalSpinner({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
   const spinRef = useRef<THREE.Group>(null!);
-  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.z += delta * 18; });
+  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.x -= delta * (isAttacking ? 80 : 18); });
   return (
-    <group position={[0, 0.85, 1.2]}>
+    <group position={[0, 0.85, 1.2]} rotation={[0, Math.PI / 2, 0]}>
       <group ref={spinRef}>
         {/* Thick vertical flywheel */}
         <mesh castShadow><cylinderGeometry args={[0.95, 0.95, 0.18, 40]} /><meshStandardMaterial color="#888" metalness={0.95} roughness={0.08} envMapIntensity={1.6} /></mesh>
@@ -528,9 +534,15 @@ export function VerticalSpinner() {
   );
 }
 
-export function LifterFork() {
+export function LifterFork({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const liftRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (liftRef.current) {
+      liftRef.current.rotation.x = THREE.MathUtils.lerp(liftRef.current.rotation.x, isAttacking ? 0.8 : 0, 0.2);
+    }
+  });
   return (
-    <group position={[0, 0.2, 1.5]}>
+    <group position={[0, 0.2, 1.5]} ref={liftRef}>
       {([-0.6, 0.6] as const).map(x => (
         <group key={`fork-${x}`} position={[x, 0, 0]}>
           <mesh castShadow receiveShadow><boxGeometry args={[0.2, 0.1, 2.0]} /><meshStandardMaterial {...STEEL_LIGHT} /></mesh>
@@ -544,33 +556,52 @@ export function LifterFork() {
   );
 }
 
-export function FlailChain() {
+export function FlailChain({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const flailRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (flailRef.current) {
+      flailRef.current.rotation.x = THREE.MathUtils.lerp(flailRef.current.rotation.x, isAttacking ? 2.5 : 0, 0.3);
+      flailRef.current.rotation.z += delta * (isAttacking ? 15 : 2);
+    }
+  });
   return (
     <group position={[0, 0.85, 0.9]}>
       {/* Mount housing */}
       <mesh castShadow receiveShadow><cylinderGeometry args={[0.32, 0.28, 0.55, 12]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
       <mesh position={[0,0.3,0]} castShadow><cylinderGeometry args={[0.12, 0.12, 0.14, 10]} /><meshStandardMaterial {...CHROME} /></mesh>
-      {/* Chain links - alternating torus rings */}
-      {Array.from({length:8}).map((_,i) => (
-        <mesh key={`link-${i}`} position={[0, 0, 0.55 + i * 0.22]}
-          rotation={[i%2===0?Math.PI/2:0, 0, 0]} castShadow>
-          <torusGeometry args={[0.1, 0.035, 8, 16]} />
-          <meshStandardMaterial color="#888" metalness={0.85} roughness={0.3} />
-        </mesh>
-      ))}
-      {/* Spiked flail ball */}
-      <mesh position={[0, 0, 2.35]} castShadow><sphereGeometry args={[0.32, 16, 16]} /><meshStandardMaterial color="#555" metalness={0.72} roughness={0.45} /></mesh>
-      {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => (
-        <mesh key={`spike-${i}`} position={[0, 0, 2.35]}
-          rotation={[i<6?i*Math.PI/3:0, i>=6?(i-6)*Math.PI/3:0, 0]} castShadow>
-          <cylinderGeometry args={[0, 0.045, 0.65, 4]} /><meshStandardMaterial {...CHROME} />
-        </mesh>
-      ))}
+      {/* Animated Flail group */}
+      <group ref={flailRef}>
+        {/* Chain links - alternating torus rings */}
+        {Array.from({length:8}).map((_,i) => (
+          <mesh key={`link-${i}`} position={[0, 0, 0.55 + i * 0.22]}
+            rotation={[i%2===0?Math.PI/2:0, 0, 0]} castShadow>
+            <torusGeometry args={[0.1, 0.035, 8, 16]} />
+            <meshStandardMaterial color="#888" metalness={0.85} roughness={0.3} />
+          </mesh>
+        ))}
+        {/* Spiked flail ball */}
+        <mesh position={[0, 0, 2.35]} castShadow><sphereGeometry args={[0.32, 16, 16]} /><meshStandardMaterial color="#555" metalness={0.72} roughness={0.45} /></mesh>
+        {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => (
+          <mesh key={`spike-${i}`} position={[0, 0, 2.35]}
+            rotation={[i<6?i*Math.PI/3:0, i>=6?(i-6)*Math.PI/3:0, 0]} castShadow>
+            <cylinderGeometry args={[0, 0.045, 0.65, 4]} /><meshStandardMaterial {...CHROME} />
+          </mesh>
+        ))}
+      </group>
     </group>
   );
 }
 
-export function CrusherClaw() {
+export function CrusherClaw({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const leftClawRef = useRef<THREE.Group>(null!);
+  const rightClawRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (leftClawRef.current && rightClawRef.current) {
+      const angle = isAttacking ? 0.35 : 0;
+      leftClawRef.current.rotation.y = THREE.MathUtils.lerp(leftClawRef.current.rotation.y, angle, 0.3);
+      rightClawRef.current.rotation.y = THREE.MathUtils.lerp(rightClawRef.current.rotation.y, -angle, 0.3);
+    }
+  });
   return (
     <group position={[0, 0.62, 1.15]}>
       {/* Central hydraulic arm */}
@@ -580,7 +611,7 @@ export function CrusherClaw() {
       <mesh position={[0, 0, 0]} rotation={[Math.PI/2,0,0]} castShadow><cylinderGeometry args={[0.28, 0.28, 1.0, 14]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
       {/* Claw arms */}
       {([-0.42, 0.42] as const).map(x => (
-        <group key={`claw-${x}`} position={[x, 0, 0]}>
+        <group key={`claw-${x}`} position={[x, 0, 0]} ref={x < 0 ? leftClawRef : rightClawRef}>
           {/* Main claw arm - tapered */}
           <mesh position={[0, 0, 0.9]} castShadow><boxGeometry args={[0.16, 0.35, 1.85]} /><meshStandardMaterial {...WORN_IRON} /></mesh>
           {/* Inner serrated edge - chrome */}
@@ -595,9 +626,9 @@ export function CrusherClaw() {
   );
 }
 
-export function HorizontalSpinner() {
+export function HorizontalSpinner({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
   const spinRef = useRef<THREE.Group>(null!);
-  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * 20; });
+  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.y += delta * (isAttacking ? 80 : 20); });
   return (
     <group position={[0, 0.72, 0.95]}>
       {/* Mount block bolted to chassis front */}
@@ -628,9 +659,15 @@ export function HorizontalSpinner() {
   );
 }
 
-export function SpikeRamrod() {
+export function SpikeRamrod({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const ramRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (ramRef.current) {
+      ramRef.current.position.z = THREE.MathUtils.lerp(ramRef.current.position.z, isAttacking ? 2.5 : 1.5, 0.3);
+    }
+  });
   return (
-    <group position={[0, 0.6, 1.5]}>
+    <group position={[0, 0.6, 1.5]} ref={ramRef}>
       <mesh castShadow receiveShadow rotation={[Math.PI/2, 0, 0]}><cylinderGeometry args={[0.15, 0.15, 1.5, 8]} /><meshStandardMaterial {...TUNGSTEN} /></mesh>
       <mesh position={[0, 0, 0.85]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0, 0.15, 0.3, 4]} /><meshStandardMaterial {...TUNGSTEN} /></mesh>
       <mesh position={[0, 0, -0.75]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0.4, 0.4, 0.1, 16]} /><meshStandardMaterial {...STEEL_DARK} /></mesh>
@@ -639,11 +676,21 @@ export function SpikeRamrod() {
   );
 }
 
-export function PneumaticLance() {
+export function PneumaticLance({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const lanceRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (lanceRef.current) {
+      // Rapid forward thrust
+      lanceRef.current.position.z = THREE.MathUtils.lerp(lanceRef.current.position.z, isAttacking ? 2.5 : 1.0, 0.4);
+    }
+  });
   return (
     <group position={[0, 0.6, 1.2]}>
       <mesh castShadow receiveShadow rotation={[Math.PI/2, 0, 0]}><cylinderGeometry args={[0.2, 0.2, 1.8, 6]} /><meshStandardMaterial {...STEEL_MID} /></mesh>
-      <mesh position={[0, 0, 1.0]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0.1, 0.1, 1.0, 16]} /><meshStandardMaterial {...CHROME} /></mesh>
+      <group ref={lanceRef}>
+        <mesh rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0.1, 0.1, 1.0, 16]} /><meshStandardMaterial {...CHROME} /></mesh>
+        <mesh position={[0, 0, 0.5]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0, 0.1, 0.2, 8]} /><meshStandardMaterial {...CHROME} /></mesh>
+      </group>
       <mesh position={[0.3, 0, -0.4]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0.15, 0.15, 1.0, 16]} /><meshStandardMaterial {...STEEL_LIGHT} /></mesh>
       <mesh position={[0.3, 0.2, -0.4]} castShadow><cylinderGeometry args={[0.08, 0.08, 0.05, 16]} /><meshStandardMaterial color="#ffffff" /></mesh>
       <mesh position={[0, 0, 1.5]} rotation={[Math.PI/2, 0, 0]} castShadow><cylinderGeometry args={[0, 0.1, 0.2, 8]} /><meshStandardMaterial {...CHROME} /></mesh>
@@ -651,9 +698,9 @@ export function PneumaticLance() {
   );
 }
 
-export function DrumSpinner() {
+export function DrumSpinner({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
   const spinRef = useRef<THREE.Group>(null!);
-  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.x += delta * 22; });
+  useFrame((_, delta) => { if (spinRef.current) spinRef.current.rotation.x -= delta * (isAttacking ? 80 : 22); });
   return (
     // Drum sits in front of chassis — rotates on horizontal axis
     <group position={[0, 0.52, 1.05]}>
@@ -695,9 +742,15 @@ export function DrumSpinner() {
   );
 }
 
-export function WedgeSlicer() {
+export function WedgeSlicer({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const slicerRef = useRef<THREE.Group>(null!);
+  useFrame((_, delta) => {
+    if (slicerRef.current) {
+      slicerRef.current.position.z = THREE.MathUtils.lerp(slicerRef.current.position.z, isAttacking ? 2.5 : 1.4, 0.4);
+    }
+  });
   return (
-    <group position={[0, 0.18, 1.4]}>
+    <group position={[0, 0.18, 1.4]} ref={slicerRef}>
       {/* Primary wedge plate - polished chrome */}
       <mesh castShadow receiveShadow rotation={[-0.22, 0, 0]}><boxGeometry args={[2.5, 0.09, 1.7]} /><meshStandardMaterial color="#b0b0b0" metalness={1.0} roughness={0.0} envMapIntensity={1.8} /></mesh>
       {/* Underlayer dark steel */}
@@ -722,7 +775,10 @@ export function WedgeSlicer() {
   );
 }
 
-export function PlasmaTorch({ intensity = 1 }: { intensity?: number }) {
+export function PlasmaTorch({ isAttacking, intensity = 1 }: { isAttacking?: boolean, intensity?: number }) {
+  const flameIntensity = isAttacking ? intensity * 5.0 : intensity;
+  const flameScale = isAttacking ? 1.8 : 1.0;
+  
   return (
     <group position={[0, 0.65, 1.15]}>
       {/* Mounting rail */}
@@ -741,7 +797,7 @@ export function PlasmaTorch({ intensity = 1 }: { intensity?: number }) {
           {/* Nozzle mouth */}
           <mesh position={[0, 0, 0.44]} rotation={[Math.PI/2,0,0]} castShadow><cylinderGeometry args={[0.06, 0.08, 0.12, 14]} /><meshStandardMaterial color="#111" roughness={1} /></mesh>
           {/* Plasma flame glow */}
-          <mesh position={[0, 0, 0.52]}><sphereGeometry args={[0.06, 10, 10]} /><meshStandardMaterial color="#4488ff" emissive="#4488ff" emissiveIntensity={3.0 * intensity} toneMapped={false} /></mesh>
+          <mesh position={[0, 0, 0.52]} scale={flameScale}><sphereGeometry args={[0.06, 10, 10]} /><meshStandardMaterial color="#4488ff" emissive="#4488ff" emissiveIntensity={3.0 * flameIntensity} toneMapped={false} /></mesh>
         </group>
       ))}
     </group>
@@ -1375,7 +1431,7 @@ export function HighFidelityRobotMesh({
         </>
       )}
       <BodyComp intensity={emissiveRef.current} teamColor={teamColor} key="body" />
-      <AttackComp intensity={emissiveRef.current} />
+      <AttackComp intensity={emissiveRef.current} isAttacking={isAttacking} />
       <DefenseComp intensity={emissiveRef.current} />
       {SecondaryComp && <SecondaryComp intensity={emissiveRef.current} />}
 

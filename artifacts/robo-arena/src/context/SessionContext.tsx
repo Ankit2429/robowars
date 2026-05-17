@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import {
   getSession, createSession, saveSession, clearSession,
-  calcPartCost, WIN_REWARD_AI, WIN_REWARD_PVP,
+  calcPartCost, WIN_REWARD_AI, WIN_REWARD_PVP, STARTING_POINTS,
   type PlayerSession,
 } from "@/lib/session";
 
@@ -9,7 +9,7 @@ interface SessionContextValue {
   session: PlayerSession | null;
   isLoggedIn: boolean;
   isEliminated: boolean;
-  login: (username: string, playerName: string) => PlayerSession;
+  login: (username: string, playerName: string, serverData?: { points: number; wins: number; credits: number; eliminated: boolean }) => PlayerSession;
   logout: () => void;
   recordWin: (isAI: boolean) => PlayerSession;
   recordLoss: () => PlayerSession;
@@ -25,15 +25,19 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<PlayerSession | null>(() => getSession());
 
-  const login = useCallback((username: string, playerName: string): PlayerSession => {
-    const existing = getSession();
-    if (existing && existing.username === username.trim().toUpperCase()) {
-      setSession(existing);
-      return existing;
-    }
-    const newSession = createSession(username, playerName);
-    setSession(newSession);
-    return newSession;
+  const login = useCallback((username: string, playerName: string, serverData?: { points: number; wins: number; credits: number; eliminated: boolean }): PlayerSession => {
+    const session: PlayerSession = {
+      username: username.trim().toUpperCase(),
+      playerName: playerName.trim(),
+      points: serverData?.points ?? STARTING_POINTS,
+      credits: serverData?.credits ?? 0,
+      wins: serverData?.wins ?? 0,
+      eliminated: serverData?.eliminated ?? false,
+      createdAt: Date.now(),
+    };
+    saveSession(session);
+    setSession(session);
+    return session;
   }, []);
 
   const logout = useCallback(() => {

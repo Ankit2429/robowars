@@ -258,8 +258,15 @@ async function ensureSchema() {
       desc: "tournament_matches.battle_room_id",
       sql: `ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS battle_room_id TEXT`,
     },
+    {
+      desc: "leaderboard.points",
+      sql: `ALTER TABLE leaderboard ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 1000`,
+    },
+    {
+      desc: "leaderboard.credits",
+      sql: `ALTER TABLE leaderboard ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0`,
+    },
   ];
-
 
 
   for (const m of migrations) {
