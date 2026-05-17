@@ -134,7 +134,8 @@ export async function tryAutoAdvance(tournamentId: number) {
 
   const currentRound = tournament.currentRound;
   const roundMatches = await db.select().from(tournamentMatchesTable)
-    .where(and(eq(tournamentMatchesTable.tournamentId, tournamentId), eq(tournamentMatchesTable.roundNumber, currentRound)));
+    .where(and(eq(tournamentMatchesTable.tournamentId, tournamentId), eq(tournamentMatchesTable.roundNumber, currentRound)))
+    .orderBy(tournamentMatchesTable.matchNumber);
 
   const allDone = roundMatches.every((m: typeof roundMatches[0]) => m.status === "finished");
   if (!allDone) return;
