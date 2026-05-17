@@ -17,7 +17,7 @@ async function boot() {
   try {
     logger.info("Starting backend boot sequence...");
 
-    const port = Number(process.env["PORT"]) || 8080;
+    const port = Number(process.env["API_PORT"]) || Number(process.env["PORT"]) || 8080;
     logger.info({ port }, "Configuration loaded");
 
     const server = createServer(app);

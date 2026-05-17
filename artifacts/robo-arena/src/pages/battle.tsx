@@ -363,7 +363,27 @@ function GameController({
     p2PosRef.current.x += p2VelRef.current.x * dt;
     p2PosRef.current.z += p2VelRef.current.z * dt;
 
-    // ── No Walls — removed bounds per request
+    // ── ARENA BOUNDARY CLAMP — hard walls to keep robots inside
+    const clampPos = (pos: PosRef) => {
+      const maxX = ARENA_X - 1.5;
+      const maxZ = ARENA_Z - 1.5;
+      if (pos.x >  maxX) { pos.x =  maxX; }
+      if (pos.x < -maxX) { pos.x = -maxX; }
+      if (pos.z >  maxZ) { pos.z =  maxZ; }
+      if (pos.z < -maxZ) { pos.z = -maxZ; }
+    };
+    clampPos(p1PosRef.current);
+    clampPos(p2PosRef.current);
+
+    // ── Wall bounce — when a robot hits a wall, invert and damp their velocity on that axis
+    const wallBounce = (pos: PosRef, vel: VelRef) => {
+      const maxX = ARENA_X - 1.5;
+      const maxZ = ARENA_Z - 1.5;
+      if (pos.x >=  maxX || pos.x <= -maxX) { vel.x *= -0.5; }
+      if (pos.z >=  maxZ || pos.z <= -maxZ) { vel.z *= -0.5; }
+    };
+    wallBounce(p1PosRef.current, p1VelRef.current);
+    wallBounce(p2PosRef.current, p2VelRef.current);
 
     // ── Clamp max speed (prevents runaway velocities)
     const clampVel = (vel: VelRef) => {
@@ -378,9 +398,9 @@ function GameController({
     p1VelRef.current.x *= damp; p1VelRef.current.z *= damp;
     p2VelRef.current.x *= damp; p2VelRef.current.z *= damp;
 
-    // ── Player 1 input (Momentum-based acceleration)
+    // ── Player 1 input (camera-relative WASD — forward = towards opponent side)
     const spd = (p1Speed / 100) * 10;
-    const accel = spd * 24; // heavy drive motors acceleration
+    const accel = spd * 24;
     const k   = keysRef.current;
     let inputX = 0, inputZ = 0;
     if (k.has("KeyW") || k.has("ArrowUp"))    inputZ -= 1;
@@ -816,7 +836,8 @@ export default function Battle() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
   const p1Speed = myRobot.stats.speed;
-  const p2Speed = aiRobot.stats.speed;
+  // In PvP use the received opponent robot stats, in AI use aiRobot defaults
+  const p2Speed = isAI ? aiRobot.stats.speed : opponentRobot.stats.speed;
 
   // ── Distance helper
   const inRange = (maxDist = 7) => {
@@ -825,15 +846,24 @@ export default function Battle() {
     return Math.sqrt(dx * dx + dz * dz) < maxDist;
   };
 
-  // ── Lunge helper - removed forced direction lock, just apply forward impulse
+  // ── Lunge helper - uses current velocity direction (NO aim lock)
   const lungeTo = (power: number) => {
-    // Apply impulse in the direction the player is already moving or facing, 
-    // or towards opponent if they want, but don't lock the direction vector
-    const dx = p2PosRef.current.x - p1PosRef.current.x;
-    const dz = p2PosRef.current.z - p1PosRef.current.z;
-    const d  = Math.sqrt(dx * dx + dz * dz) || 1;
-    p1VelRef.current.x += (dx/d) * power;
-    p1VelRef.current.z += (dz/d) * power;
+    // Use the current velocity direction if moving, otherwise use the direction towards opponent
+    const vx = p1VelRef.current.x;
+    const vz = p1VelRef.current.z;
+    const vspd = Math.sqrt(vx * vx + vz * vz);
+    if (vspd > 1.5) {
+      // Move in current facing direction (no aim lock)
+      p1VelRef.current.x += (vx / vspd) * power;
+      p1VelRef.current.z += (vz / vspd) * power;
+    } else {
+      // Standing still — lunge towards opponent as fallback
+      const dx = p2PosRef.current.x - p1PosRef.current.x;
+      const dz = p2PosRef.current.z - p1PosRef.current.z;
+      const d  = Math.sqrt(dx * dx + dz * dz) || 1;
+      p1VelRef.current.x += (dx/d) * power * 0.6;
+      p1VelRef.current.z += (dz/d) * power * 0.6;
+    }
   };
 
   // ── Damage calculator with Armor Scaling
@@ -918,11 +948,21 @@ export default function Battle() {
   const fireBoost = useCallback(() => {
     if (boostActiveRef.current) return;
     boostActiveRef.current = true;
-    const dx = p2PosRef.current.x - p1PosRef.current.x;
-    const dz = p2PosRef.current.z - p1PosRef.current.z;
-    const d  = Math.sqrt(dx * dx + dz * dz) || 1;
-    p1VelRef.current.x += (dx/d) * 36; // massive burst to counter friction
-    p1VelRef.current.z += (dz/d) * 36;
+    // Boost in current movement direction — no aim lock
+    const vx = p1VelRef.current.x;
+    const vz = p1VelRef.current.z;
+    const vspd = Math.sqrt(vx * vx + vz * vz);
+    if (vspd > 0.5) {
+      p1VelRef.current.x += (vx / vspd) * 36;
+      p1VelRef.current.z += (vz / vspd) * 36;
+    } else {
+      // No movement — boost towards opponent as fallback
+      const dx = p2PosRef.current.x - p1PosRef.current.x;
+      const dz = p2PosRef.current.z - p1PosRef.current.z;
+      const d = Math.sqrt(dx*dx+dz*dz)||1;
+      p1VelRef.current.x += (dx/d) * 36;
+      p1VelRef.current.z += (dz/d) * 36;
+    }
     setTimeout(() => { boostActiveRef.current = false; }, BOOST_CD);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
